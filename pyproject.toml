@@ -15,5 +15,5 @@ dependencies = [
 ]
 
 [project.scripts]
-mcp-imap-server = "mcp_imap_server.core:main"
+mcp-imap-server = "mcp_imap_server.server:main"
 mcp-imap-credentials = "mcp_imap_server.cli:main"
