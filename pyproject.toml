@@ -1,0 +1,13 @@
+[project]
+name = "mcp-imap-server"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "imap-tools>=1.11.0",
+    "mcp[cli]>=1.10.1",
+]
+
+[project.scripts]
+mcp-imap-server = "mcp_imap_server.main:main"
