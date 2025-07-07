@@ -7,7 +7,11 @@ requires-python = ">=3.13"
 dependencies = [
     "imap-tools>=1.11.0",
     "mcp[cli]>=1.10.1",
+    "platformdirs>=4.3.8",
+    "typer>=0.16.0",
+    "rich>=13.0.0",
 ]
 
 [project.scripts]
-mcp-imap-server = "mcp_imap_server.main:main"
+mcp-imap-server = "mcp_imap_server.core:main"
+mcp-imap-credentials = "mcp_imap_server.cli:main"

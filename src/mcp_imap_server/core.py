@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from imap_tools import MailBox, AND
 from mcp.server.fastmcp import FastMCP
 
+from .credentials import credential_manager
+
 
 @dataclass
 class ImapState:
@@ -209,6 +211,63 @@ async def logout():
     state.mailbox.logout()
     state.mailbox = None
     return "Logout successful."
+
+
+@mcp.tool()
+async def add_account(name: str, username: str, password: str, server: str):
+    """
+    Store credentials for an IMAP account.
+
+    Args:
+        name: A friendly name for the account (e.g., "work", "personal")
+        username: IMAP username
+        password: IMAP password
+        server: IMAP server hostname
+    """
+    credential_manager.add_account(name, username, password, server)
+    return f"Account '{name}' credentials stored successfully."
+
+
+@mcp.tool()
+async def list_stored_accounts():
+    """List all stored account names."""
+    accounts = credential_manager.list_accounts()
+    if not accounts:
+        return "No accounts stored."
+    return f"Stored accounts: {', '.join(accounts)}"
+
+
+@mcp.tool()
+async def remove_account(name: str):
+    """
+    Remove stored credentials for an account.
+
+    Args:
+        name: The name of the account to remove
+    """
+    if credential_manager.remove_account(name):
+        return f"Account '{name}' removed successfully."
+    else:
+        return f"Account '{name}' not found."
+
+
+@mcp.tool()
+async def login_with_stored_account(account_name: str):
+    """
+    Log in using stored account credentials.
+
+    Args:
+        account_name: The name of the stored account to use for login
+    """
+    credentials = credential_manager.get_account(account_name)
+    if not credentials:
+        return f"Account '{account_name}' not found. Use list_stored_accounts to see available accounts."
+
+    state = mcp.get_context().request_context.lifespan_context
+
+    state.mailbox = MailBox(credentials.server)
+    state.mailbox.login(credentials.username, credentials.password)
+    return f"Login successful using stored account '{account_name}'."
 
 
 def main():
