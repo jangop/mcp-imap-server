@@ -37,11 +37,18 @@ def list():
 @app.command()
 def add(
     name: str = typer.Argument(..., help="Account name (e.g., 'work', 'personal')"),
-    username: str = typer.Option(..., "--username", "-u", help="IMAP username"),
-    password: str = typer.Option(
-        ..., "--password", "-p", hide_input=True, help="IMAP password"
+    username: Optional[str] = typer.Option(
+        None, "--username", "-u", help="IMAP username"
     ),
-    server: str = typer.Option(..., "--server", "-s", help="IMAP server hostname"),
+    password: Optional[str] = typer.Option(
+        None,
+        "--password",
+        "-p",
+        help="IMAP password (will prompt securely if not provided)",
+    ),
+    server: Optional[str] = typer.Option(
+        None, "--server", "-s", help="IMAP server hostname"
+    ),
 ):
     """Add a new IMAP account or update an existing one."""
     try:
@@ -51,6 +58,16 @@ def add(
             if not typer.confirm(f"Account '{name}' already exists. Update it?"):
                 rprint("[yellow]Operation cancelled.[/yellow]")
                 return
+
+        # Prompt for missing information
+        if username is None:
+            username = typer.prompt("Username")
+
+        if password is None:
+            password = typer.prompt("Password", hide_input=True)
+
+        if server is None:
+            server = typer.prompt("IMAP Server")
 
         credential_manager.add_account(name, username, password, server)
 
@@ -71,7 +88,10 @@ def update(
         None, "--username", "-u", help="New IMAP username"
     ),
     password: Optional[str] = typer.Option(
-        None, "--password", "-p", hide_input=True, help="New IMAP password"
+        None,
+        "--password",
+        "-p",
+        help="New IMAP password (will prompt securely if flag is used)",
     ),
     server: Optional[str] = typer.Option(
         None, "--server", "-s", help="New IMAP server hostname"
@@ -84,6 +104,13 @@ def update(
         if not existing:
             rprint(f"[red]Account '{name}' not found.[/red]")
             raise typer.Exit(1)
+
+        # Handle password prompting - check if --password flag was used
+        import sys
+
+        password_flag_used = "--password" in sys.argv or "-p" in sys.argv
+        if password_flag_used and password is None:
+            password = typer.prompt("New password", hide_input=True)
 
         # Use existing values if new ones not provided
         new_username = username if username is not None else existing.username
