@@ -202,6 +202,31 @@ async def delete_email(uid: str):
 
 
 @mcp.tool()
+async def move_email(uid: str, destination_folder: str):
+    """
+    Move an email to a specified folder.
+
+    Args:
+        uid: The UID of the email to move.
+        destination_folder: The name of the destination folder to move the email to.
+    """
+    state = mcp.get_context().request_context.lifespan_context
+    if not state.mailbox:
+        return "Not logged in. Please login first."
+
+    try:
+        # Check if destination folder exists, create it if it doesn't
+        if not state.mailbox.folder.exists(destination_folder):
+            state.mailbox.folder.create(destination_folder)
+
+        # Move the email to the destination folder
+        state.mailbox.move(uid, destination_folder)
+        return f"Email {uid} moved to folder '{destination_folder}'."
+    except Exception as e:
+        return f"Failed to move email {uid}: {str(e)}"
+
+
+@mcp.tool()
 async def logout():
     """Log out of the IMAP server."""
     state = mcp.get_context().request_context.lifespan_context
