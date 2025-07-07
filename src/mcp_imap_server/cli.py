@@ -25,13 +25,49 @@ def list():
     table.add_column("Account Name", style="cyan", no_wrap=True)
     table.add_column("Username", style="green")
     table.add_column("Server", style="blue")
+    table.add_column("Password Status", style="magenta")
 
     for account_name in accounts:
-        credentials = credential_manager.get_account(account_name)
-        if credentials:
-            table.add_row(account_name, credentials.username, credentials.server)
+        try:
+            credentials = credential_manager.get_account(account_name)
+            if credentials:
+                table.add_row(
+                    account_name, credentials.username, credentials.server, "✓ Secure"
+                )
+        except RuntimeError as e:
+            if "Password not found in keyring" in str(e):
+                # Get account metadata without password
+                config = credential_manager._read_config()
+                account_data = config.get("accounts", {}).get(account_name, {})
+                table.add_row(
+                    account_name,
+                    account_data.get("username", "Unknown"),
+                    account_data.get("server", "Unknown"),
+                    "⚠ Missing",
+                )
+            else:
+                table.add_row(account_name, "Error", "Error", "✗ Error")
 
     console.print(table)
+
+    # Show summary
+    working_accounts = 0
+    missing_passwords = 0
+    error_accounts = 0
+
+    for account_name in accounts:
+        try:
+            credential_manager.get_account(account_name)
+            working_accounts += 1
+        except RuntimeError as e:
+            if "Password not found in keyring" in str(e):
+                missing_passwords += 1
+            else:
+                error_accounts += 1
+
+    rprint(
+        f"\n[blue]Summary:[/blue] {working_accounts} working, {missing_passwords} missing passwords, {error_accounts} errors"
+    )
 
 
 @app.command()
@@ -76,6 +112,14 @@ def add(
         else:
             rprint(f"[green]Account '{name}' added successfully![/green]")
 
+        rprint("[dim]Password stored securely in system keyring[/dim]")
+
+    except RuntimeError as e:
+        rprint(f"[red]Keyring error: {e}[/red]")
+        rprint(
+            "[yellow]Tip: Make sure you're logged into your system and keyring is available[/yellow]"
+        )
+        raise typer.Exit(1)
     except Exception as e:
         rprint(f"[red]Error adding account: {e}[/red]")
         raise typer.Exit(1)
@@ -154,17 +198,31 @@ def remove(
     """Remove an IMAP account."""
     try:
         # Check if account exists
-        existing = credential_manager.get_account(name)
-        if not existing:
+        try:
+            existing = credential_manager.get_account(name)
+        except RuntimeError as e:
+            if "Password not found in keyring" in str(e):
+                rprint(
+                    f"[yellow]Warning: Account '{name}' exists but password not found in keyring[/yellow]"
+                )
+                rprint("[yellow]Will remove account metadata anyway[/yellow]")
+                existing = None
+            else:
+                raise
+
+        if not existing and name not in credential_manager.list_accounts():
             rprint(f"[red]Account '{name}' not found.[/red]")
             raise typer.Exit(1)
 
         # Confirm removal unless --force is used
         if not force:
-            rprint("[blue]Account details:[/blue]")
-            rprint(f"  Name: {name}")
-            rprint(f"  Username: {existing.username}")
-            rprint(f"  Server: {existing.server}")
+            if existing:
+                rprint("[blue]Account details:[/blue]")
+                rprint(f"  Name: {name}")
+                rprint(f"  Username: {existing.username}")
+                rprint(f"  Server: {existing.server}")
+            else:
+                rprint(f"[blue]Account: {name}[/blue] (password missing from keyring)")
 
             if not typer.confirm(f"Are you sure you want to remove account '{name}'?"):
                 rprint("[yellow]Operation cancelled.[/yellow]")
@@ -173,10 +231,14 @@ def remove(
         success = credential_manager.remove_account(name)
         if success:
             rprint(f"[green]Account '{name}' removed successfully![/green]")
+            rprint("[dim]Password removed from system keyring[/dim]")
         else:
             rprint(f"[red]Failed to remove account '{name}'.[/red]")
             raise typer.Exit(1)
 
+    except RuntimeError as e:
+        rprint(f"[red]Keyring error: {e}[/red]")
+        raise typer.Exit(1)
     except Exception as e:
         rprint(f"[red]Error removing account: {e}[/red]")
         raise typer.Exit(1)
@@ -184,7 +246,7 @@ def remove(
 
 @app.command()
 def config():
-    """Show configuration file location."""
+    """Show configuration file location and keyring information."""
     config_path = credential_manager.config_file
     rprint(f"[blue]Configuration file:[/blue] {config_path}")
 
@@ -203,6 +265,76 @@ def config():
         rprint(
             "[yellow]✗ File does not exist (will be created when first account is added)[/yellow]"
         )
+
+    # Show keyring information
+    rprint("\n[blue]Keyring Information:[/blue]")
+    keyring_info = credential_manager.get_keyring_info()
+
+    if "error" in keyring_info:
+        rprint(f"[red]✗ Keyring error: {keyring_info['error']}[/red]")
+    else:
+        rprint(f"[green]✓ Keyring backend:[/green] {keyring_info['backend']}")
+        if keyring_info["name"] != "Unknown":
+            rprint(f"[blue]Backend name:[/blue] {keyring_info['name']}")
+        rprint(f"[blue]Priority:[/blue] {keyring_info['priority']}")
+
+    rprint(
+        "\n[blue]Security:[/blue] Passwords are stored securely in your system keyring"
+    )
+    rprint(
+        "[blue]Metadata:[/blue] Account usernames and servers are stored in the TOML file"
+    )
+
+
+@app.command()
+def migrate():
+    """Migrate accounts with plain-text passwords to secure keyring storage."""
+    try:
+        config = credential_manager._read_config()
+
+        if "accounts" not in config:
+            rprint("[yellow]No accounts found to migrate.[/yellow]")
+            return
+
+        accounts_to_migrate = []
+        for account_name, account_data in config["accounts"].items():
+            if "password" in account_data:
+                accounts_to_migrate.append(account_name)
+
+        if not accounts_to_migrate:
+            rprint("[green]All accounts already use secure keyring storage![/green]")
+            return
+
+        rprint(
+            f"[yellow]Found {len(accounts_to_migrate)} account(s) with plain-text passwords:[/yellow]"
+        )
+        for account in accounts_to_migrate:
+            rprint(f"  • {account}")
+
+        if not typer.confirm("\nMigrate these accounts to secure keyring storage?"):
+            rprint("[yellow]Migration cancelled.[/yellow]")
+            return
+
+        # Trigger migration by accessing each account
+        migrated = 0
+        for account_name in accounts_to_migrate:
+            try:
+                credential_manager.get_account(account_name)
+                migrated += 1
+                rprint(f"[green]✓ Migrated: {account_name}[/green]")
+            except Exception as e:
+                rprint(f"[red]✗ Failed to migrate {account_name}: {e}[/red]")
+
+        rprint(
+            f"\n[green]Migration completed! {migrated}/{len(accounts_to_migrate)} accounts migrated.[/green]"
+        )
+        rprint(
+            "[dim]Plain-text passwords have been removed from the config file.[/dim]"
+        )
+
+    except Exception as e:
+        rprint(f"[red]Migration error: {e}[/red]")
+        raise typer.Exit(1)
 
 
 def main():
