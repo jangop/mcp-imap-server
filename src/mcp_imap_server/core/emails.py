@@ -139,9 +139,9 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except ValueError as e:
-            return f"Invalid date format. Use YYYY-MM-DD format. Error: {str(e)}"
+            return f"Invalid date format. Use YYYY-MM-DD format. Error: {e!s}"
         except Exception as e:
-            return f"Failed to search emails by date: {str(e)}"
+            return f"Failed to search emails by date: {e!s}"
 
     @mcp.tool()
     async def search_emails_by_size(
@@ -204,7 +204,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to search emails by size: {str(e)}"
+            return f"Failed to search emails by size: {e!s}"
 
     @mcp.tool()
     async def search_emails_by_body_text(
@@ -280,7 +280,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to search emails by text: {str(e)}"
+            return f"Failed to search emails by text: {e!s}"
 
     @mcp.tool()
     async def search_emails_with_attachments(
@@ -329,15 +329,15 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to search emails with attachments: {str(e)}"
+            return f"Failed to search emails with attachments: {e!s}"
 
     @mcp.tool()
     async def search_emails_by_flags(
-        seen: bool = None,
-        flagged: bool = None,
-        deleted: bool = None,
-        draft: bool = None,
-        answered: bool = None,
+        seen: bool | None = None,
+        flagged: bool | None = None,
+        deleted: bool | None = None,
+        draft: bool | None = None,
+        answered: bool | None = None,
         headers_only: bool = True,
     ):
         """
@@ -418,7 +418,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to search emails by flags: {str(e)}"
+            return f"Failed to search emails by flags: {e!s}"
 
     @mcp.tool()
     async def advanced_email_search(
@@ -429,9 +429,9 @@ def register_email_tools(mcp: FastMCP):
         end_date: str = "",
         min_size: int = 0,
         max_size: int = 0,
-        has_attachments: bool = None,
-        is_unread: bool = None,
-        is_flagged: bool = None,
+        has_attachments: bool | None = None,
+        is_unread: bool | None = None,
+        is_flagged: bool | None = None,
         headers_only: bool = True,
     ):
         """
@@ -558,7 +558,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to perform advanced search: {str(e)}"
+            return f"Failed to perform advanced search: {e!s}"
 
     @mcp.tool()
     async def get_recent_emails(count: int = 10, headers_only: bool = True):
@@ -602,7 +602,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to get recent emails: {str(e)}"
+            return f"Failed to get recent emails: {e!s}"
 
     @mcp.tool()
     async def read_email(uid: str):
@@ -713,7 +713,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to extract attachments from email {uid}: {str(e)}"
+            return f"Failed to extract attachments from email {uid}: {e!s}"
 
     @mcp.tool()
     async def list_email_attachments(uid: str):
@@ -768,7 +768,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to list attachments for email {uid}: {str(e)}"
+            return f"Failed to list attachments for email {uid}: {e!s}"
 
     # BULK OPERATIONS
     @mcp.tool()
@@ -801,7 +801,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to mark emails as read: {str(e)}"
+            return f"Failed to mark emails as read: {e!s}"
 
     @mcp.tool()
     async def bulk_mark_as_unread(uid_list: str, chunk_size: int = 100):
@@ -833,7 +833,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to mark emails as unread: {str(e)}"
+            return f"Failed to mark emails as unread: {e!s}"
 
     @mcp.tool()
     async def bulk_delete_emails(uid_list: str, chunk_size: int = 100):
@@ -865,7 +865,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to delete emails: {str(e)}"
+            return f"Failed to delete emails: {e!s}"
 
     @mcp.tool()
     async def bulk_move_emails(
@@ -905,7 +905,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to move emails: {str(e)}"
+            return f"Failed to move emails: {e!s}"
 
     @mcp.tool()
     async def bulk_copy_emails(
@@ -945,7 +945,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to copy emails: {str(e)}"
+            return f"Failed to copy emails: {e!s}"
 
     @mcp.tool()
     async def bulk_flag_emails(
@@ -996,7 +996,7 @@ def register_email_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to flag emails: {str(e)}"
+            return f"Failed to flag emails: {e!s}"
 
     @mcp.tool()
     async def mark_as_read(uid: str):

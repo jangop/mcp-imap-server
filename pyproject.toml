@@ -19,4 +19,4 @@ mcp-imap-server = "mcp_imap_server.server:main"
 mcp-imap-credentials = "mcp_imap_server.cli:main"
 
 [tool.ruff.lint]
-select = ["UP", "E4", "E7", "E9", "F", "B"]
+select = ["TRY", "RUF", "UP", "E4", "E7", "E9", "F", "B"]

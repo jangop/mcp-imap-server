@@ -88,7 +88,7 @@ def register_folder_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to list folders: {str(e)}"
+            return f"Failed to list folders: {e!s}"
 
     @mcp.tool()
     async def get_folder_info(folder_name: str):
@@ -149,7 +149,7 @@ def register_folder_tools(mcp: FastMCP):
             return info
 
         except Exception as e:
-            return f"Failed to get folder info for '{folder_name}': {str(e)}"
+            return f"Failed to get folder info for '{folder_name}': {e!s}"
 
     @mcp.tool()
     async def create_folder(folder_name: str):
@@ -171,7 +171,7 @@ def register_folder_tools(mcp: FastMCP):
             return f"Successfully created folder '{folder_name}'."
 
         except Exception as e:
-            return f"Failed to create folder '{folder_name}': {str(e)}"
+            return f"Failed to create folder '{folder_name}': {e!s}"
 
     @mcp.tool()
     async def delete_folder(folder_name: str, force: bool = False):
@@ -204,7 +204,7 @@ def register_folder_tools(mcp: FastMCP):
             return f"Successfully deleted folder '{folder_name}'."
 
         except Exception as e:
-            return f"Failed to delete folder '{folder_name}': {str(e)}"
+            return f"Failed to delete folder '{folder_name}': {e!s}"
 
     @mcp.tool()
     async def rename_folder(old_name: str, new_name: str):
@@ -230,7 +230,7 @@ def register_folder_tools(mcp: FastMCP):
             return f"Successfully renamed folder '{old_name}' to '{new_name}'."
 
         except Exception as e:
-            return f"Failed to rename folder '{old_name}' to '{new_name}': {str(e)}"
+            return f"Failed to rename folder '{old_name}' to '{new_name}': {e!s}"
 
     @mcp.tool()
     async def subscribe_folder(folder_name: str):
@@ -252,7 +252,7 @@ def register_folder_tools(mcp: FastMCP):
             return f"Successfully subscribed to folder '{folder_name}'."
 
         except Exception as e:
-            return f"Failed to subscribe to folder '{folder_name}': {str(e)}"
+            return f"Failed to subscribe to folder '{folder_name}': {e!s}"
 
     @mcp.tool()
     async def unsubscribe_folder(folder_name: str):
@@ -274,7 +274,7 @@ def register_folder_tools(mcp: FastMCP):
             return f"Successfully unsubscribed from folder '{folder_name}'."
 
         except Exception as e:
-            return f"Failed to unsubscribe from folder '{folder_name}': {str(e)}"
+            return f"Failed to unsubscribe from folder '{folder_name}': {e!s}"
 
     @mcp.tool()
     async def list_subscribed_folders():
@@ -294,7 +294,7 @@ def register_folder_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to list subscribed folders: {str(e)}"
+            return f"Failed to list subscribed folders: {e!s}"
 
     # PAGINATION SUPPORT
     @mcp.tool()
@@ -398,7 +398,7 @@ def register_folder_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to list emails with pagination: {str(e)}"
+            return f"Failed to list emails with pagination: {e!s}"
 
     # FOLDER STATISTICS & ANALYTICS
     @mcp.tool()
@@ -558,7 +558,7 @@ def register_folder_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to get folder statistics for '{folder_name}': {str(e)}"
+            return f"Failed to get folder statistics for '{folder_name}': {e!s}"
 
     @mcp.tool()
     async def get_all_folders_statistics():
@@ -636,7 +636,7 @@ def register_folder_tools(mcp: FastMCP):
                     folder_stats.append(
                         {
                             "name": getattr(folder, "name", "unknown"),
-                            "error": f"Could not access folder: {str(e)}",
+                            "error": f"Could not access folder: {e!s}",
                         }
                     )
                     # Try to restore current folder if possible
@@ -669,7 +669,7 @@ def register_folder_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to get all folders statistics: {str(e)}"
+            return f"Failed to get all folders statistics: {e!s}"
 
     # HEADERS-ONLY OPERATIONS
     @mcp.tool()
@@ -704,7 +704,7 @@ def register_folder_tools(mcp: FastMCP):
             return f"Email with UID {uid} not found."
 
         except Exception as e:
-            return f"Failed to get email headers for UID {uid}: {str(e)}"
+            return f"Failed to get email headers for UID {uid}: {e!s}"
 
     @mcp.tool()
     async def batch_get_headers(uid_list: str):
@@ -756,4 +756,4 @@ def register_folder_tools(mcp: FastMCP):
             }
 
         except Exception as e:
-            return f"Failed to get batch headers: {str(e)}"
+            return f"Failed to get batch headers: {e!s}"

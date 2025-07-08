@@ -87,4 +87,4 @@ def register_compose_tools(mcp: FastMCP):
             return f"Email successfully created and saved to '{folder}' folder."
 
         except Exception as e:
-            return f"Failed to create email: {str(e)}"
+            return f"Failed to create email: {e!s}"
