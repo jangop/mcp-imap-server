@@ -245,45 +245,44 @@ def remove(
 
 
 @app.command()
-def config():
-    """Show configuration file location and keyring information."""
-    config_path = credential_manager.config_file
-    rprint(f"[blue]Configuration file:[/blue] {config_path}")
+def info():
+    """Show information about keyring backend and configuration."""
+    try:
+        # Get keyring info
+        keyring_info = credential_manager.get_keyring_info()
 
-    if config_path.exists():
-        rprint("[green]✓ File exists[/green]")
+        rprint("[blue]MCP IMAP Server Configuration[/blue]\n")
 
-        # Show file size
-        size = config_path.stat().st_size
-        rprint(f"[blue]Size:[/blue] {size} bytes")
+        # Show config file location
+        rprint(f"[cyan]Config file:[/cyan] {credential_manager.config_file}")
 
-        # Count accounts
+        # Show keyring info
+        rprint("\n[cyan]Keyring Backend:[/cyan]")
+        if "error" in keyring_info:
+            rprint(f"  [red]Error: {keyring_info['error']}[/red]")
+        else:
+            rprint(f"  Backend: {keyring_info.get('backend', 'Unknown')}")
+            rprint(f"  Name: {keyring_info.get('name', 'Unknown')}")
+            rprint(f"  Priority: {keyring_info.get('priority', 'Unknown')}")
+
+        # Show accounts summary
         accounts = credential_manager.list_accounts()
-        count = len(accounts)
-        rprint(f"[blue]Accounts:[/blue] {count}")
-    else:
-        rprint(
-            "[yellow]✗ File does not exist (will be created when first account is added)[/yellow]"
-        )
+        rprint(f"\n[cyan]Accounts:[/cyan] {len(accounts)} stored")
 
-    # Show keyring information
-    rprint("\n[blue]Keyring Information:[/blue]")
-    keyring_info = credential_manager.get_keyring_info()
+        if accounts:
+            for account in accounts:
+                try:
+                    credential_manager.get_account(account)
+                    rprint(f"  ✓ {account}")
+                except RuntimeError as e:
+                    if "Password not found in keyring" in str(e):
+                        rprint(f"  ⚠ {account} (password missing)")
+                    else:
+                        rprint(f"  ✗ {account} (error)")
 
-    if "error" in keyring_info:
-        rprint(f"[red]✗ Keyring error: {keyring_info['error']}[/red]")
-    else:
-        rprint(f"[green]✓ Keyring backend:[/green] {keyring_info['backend']}")
-        if keyring_info["name"] != "Unknown":
-            rprint(f"[blue]Backend name:[/blue] {keyring_info['name']}")
-        rprint(f"[blue]Priority:[/blue] {keyring_info['priority']}")
-
-    rprint(
-        "\n[blue]Security:[/blue] Passwords are stored securely in your system keyring"
-    )
-    rprint(
-        "[blue]Metadata:[/blue] Account usernames and servers are stored in the TOML file"
-    )
+    except Exception as e:
+        rprint(f"[red]Error getting info: {e}[/red]")
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -337,10 +336,5 @@ def migrate():
         raise typer.Exit(1)
 
 
-def main():
-    """Entry point for the CLI."""
-    app()
-
-
 if __name__ == "__main__":
-    main()
+    app()

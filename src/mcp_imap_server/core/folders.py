@@ -1,8 +1,8 @@
 """Folder management tools for IMAP server."""
 
-from imap_tools import AND, MailMessageFlags
 from mcp.server.fastmcp import FastMCP
 from .state import get_state_or_error
+from datetime import datetime
 
 
 def register_folder_tools(mcp: FastMCP):
@@ -10,7 +10,7 @@ def register_folder_tools(mcp: FastMCP):
 
     @mcp.tool()
     async def list_folders():
-        """List all folders in the mailbox."""
+        """List all available folders."""
         state, error = get_state_or_error(mcp.get_context())
         if error:
             return error
@@ -19,19 +19,19 @@ def register_folder_tools(mcp: FastMCP):
         return [folder.name for folder in folders]
 
     @mcp.tool()
-    async def select_folder(folder: str):
+    async def select_folder(folder_name: str):
         """
-        Select a folder to work with.
+        Switch to a specific folder.
 
         Args:
-            folder: The name of the folder to select.
+            folder_name: The name of the folder to switch to.
         """
         state, error = get_state_or_error(mcp.get_context())
         if error:
             return error
 
-        state.mailbox.folder.set(folder)
-        return f"Selected folder: {folder}"
+        state.mailbox.folder.set(folder_name)
+        return f"Switched to folder: {folder_name}"
 
     @mcp.tool()
     async def move_email(uid: str, destination_folder: str):
@@ -49,47 +49,41 @@ def register_folder_tools(mcp: FastMCP):
         state.mailbox.move(uid, destination_folder)
         return f"Email {uid} moved to {destination_folder}."
 
-    # ENHANCED FOLDER MANAGEMENT
     @mcp.tool()
     async def list_folders_detailed():
-        """List all folders with detailed information including hierarchy and attributes."""
+        """
+        List all folders with detailed information including hierarchy.
+        """
         state, error = get_state_or_error(mcp.get_context())
         if error:
             return error
 
         try:
             folders = state.mailbox.folder.list()
+            folder_info = []
 
-            detailed_folders = []
             for folder in folders:
-                folder_info = {
+                # Determine folder level based on separator
+                level = folder.name.count(folder.delimiter) if folder.delimiter else 0
+
+                folder_data = {
                     "name": folder.name,
+                    "flags": list(folder.flags) if folder.flags else [],
                     "delimiter": folder.delimiter,
-                    "flags": list(folder.flags) if hasattr(folder, "flags") else [],
+                    "level": level,
+                    "is_selectable": "\\Noselect" not in (folder.flags or []),
+                    "has_children": "\\HasChildren" in (folder.flags or []),
+                    "has_no_children": "\\HasNoChildren" in (folder.flags or []),
                 }
+                folder_info.append(folder_data)
 
-                # Add hierarchy information
-                parts = (
-                    folder.name.split(folder.delimiter)
-                    if folder.delimiter
-                    else [folder.name]
-                )
-                folder_info.update(
-                    {
-                        "level": len(parts) - 1,
-                        "parent": folder.delimiter.join(parts[:-1])
-                        if len(parts) > 1
-                        else None,
-                        "display_name": parts[-1],
-                    }
-                )
-
-                detailed_folders.append(folder_info)
+            # Sort by name for consistent display
+            folder_info.sort(key=lambda x: x["name"])
 
             return {
-                "message": f"Found {len(detailed_folders)} folders",
-                "count": len(detailed_folders),
-                "folders": detailed_folders,
+                "message": f"Found {len(folder_info)} folders",
+                "count": len(folder_info),
+                "folders": folder_info,
             }
 
         except Exception as e:
@@ -108,72 +102,51 @@ def register_folder_tools(mcp: FastMCP):
             return error
 
         try:
-            # Check if folder exists
             if not state.mailbox.folder.exists(folder_name):
                 return f"Folder '{folder_name}' does not exist."
 
-            # Get folder status
+            # Save current folder and switch to target folder
             current_folder = state.mailbox.folder.get()
             state.mailbox.folder.set(folder_name)
 
-            # Get folder statistics
-            folder_status = state.mailbox.folder.status()
+            # Get folder info
+            folder_status = state.mailbox.folder.status(folder_name)
 
-            # Get some sample messages for additional info
+            # Count various message types
             total_messages = len(list(state.mailbox.fetch(headers_only=True)))
             unread_messages = len(
-                list(state.mailbox.fetch(AND(seen=False), headers_only=True))
+                list(state.mailbox.fetch("UNSEEN", headers_only=True))
             )
 
-            # Get folder from list to get attributes
+            # Get folder attributes
+            folders = state.mailbox.folder.list()
             folder_obj = None
-            for folder in state.mailbox.folder.list():
+            for folder in folders:
                 if folder.name == folder_name:
                     folder_obj = folder
                     break
 
-            result = {
-                "name": folder_name,
-                "exists": True,
-                "total_messages": total_messages,
-                "unread_messages": unread_messages,
-                "read_messages": total_messages - unread_messages,
-                "status": folder_status if folder_status else {},
-            }
-
-            if folder_obj:
-                result.update(
-                    {
-                        "delimiter": folder_obj.delimiter,
-                        "flags": list(folder_obj.flags)
-                        if hasattr(folder_obj, "flags")
-                        else [],
-                    }
-                )
-
-                # Add hierarchy info
-                parts = (
-                    folder_name.split(folder_obj.delimiter)
-                    if folder_obj.delimiter
-                    else [folder_name]
-                )
-                result.update(
-                    {
-                        "level": len(parts) - 1,
-                        "parent": folder_obj.delimiter.join(parts[:-1])
-                        if len(parts) > 1
-                        else None,
-                        "display_name": parts[-1],
-                    }
-                )
-
             # Restore original folder
             state.mailbox.folder.set(current_folder)
 
-            return result
+            info = {
+                "name": folder_name,
+                "total_messages": total_messages,
+                "unread_messages": unread_messages,
+                "read_messages": total_messages - unread_messages,
+                "flags": list(folder_obj.flags)
+                if folder_obj and folder_obj.flags
+                else [],
+                "delimiter": folder_obj.delimiter if folder_obj else "/",
+                "is_selectable": folder_obj
+                and "\\Noselect" not in (folder_obj.flags or []),
+                "status": folder_status._asdict() if folder_status else {},
+            }
+
+            return info
 
         except Exception as e:
-            return f"Failed to get folder info: {str(e)}"
+            return f"Failed to get folder info for '{folder_name}': {str(e)}"
 
     @mcp.tool()
     async def create_folder(folder_name: str):
@@ -259,7 +232,7 @@ def register_folder_tools(mcp: FastMCP):
     @mcp.tool()
     async def subscribe_folder(folder_name: str):
         """
-        Subscribe to a folder.
+        Subscribe to a folder to make it visible in mail clients.
 
         Args:
             folder_name: The name of the folder to subscribe to.
@@ -281,7 +254,7 @@ def register_folder_tools(mcp: FastMCP):
     @mcp.tool()
     async def unsubscribe_folder(folder_name: str):
         """
-        Unsubscribe from a folder.
+        Unsubscribe from a folder to hide it from mail clients.
 
         Args:
             folder_name: The name of the folder to unsubscribe from.
@@ -291,6 +264,9 @@ def register_folder_tools(mcp: FastMCP):
             return error
 
         try:
+            if not state.mailbox.folder.exists(folder_name):
+                return f"Folder '{folder_name}' does not exist."
+
             state.mailbox.folder.unsubscribe(folder_name)
             return f"Successfully unsubscribed from folder '{folder_name}'."
 
@@ -330,25 +306,25 @@ def register_folder_tools(mcp: FastMCP):
         List emails with pagination support.
 
         Args:
-            page: Page number starting from 1 (default: 1).
-            page_size: Number of emails per page (default: 20).
-            headers_only: If True, only fetch headers for faster loading (default: True).
-            unread_only: If True, only show unread emails (default: False).
-            reverse: If True, show newest emails first (default: True).
+            page: Page number to retrieve (1-based, default: 1)
+            page_size: Number of emails per page (1-1000, default: 20)
+            headers_only: If True, only fetch headers for faster loading (default: True)
+            unread_only: If True, only show unread emails (default: False)
+            reverse: If True, show newest emails first (default: True)
         """
         state, error = get_state_or_error(mcp.get_context())
         if error:
             return error
 
+        if page < 1:
+            return "Page number must be 1 or greater."
+
+        if page_size < 1 or page_size > 1000:
+            return "Page size must be between 1 and 1000."
+
         try:
-            if page < 1:
-                return "Page number must be 1 or greater."
-
-            if page_size < 1 or page_size > 1000:
-                return "Page size must be between 1 and 1000."
-
             # Build search criteria
-            criteria = AND(seen=False) if unread_only else None
+            criteria = "UNSEEN" if unread_only else None
 
             # Calculate offset and limit
             offset = (page - 1) * page_size
@@ -401,296 +377,300 @@ def register_folder_tools(mcp: FastMCP):
             has_prev = page > 1
 
             return {
-                "message": f"Page {page} of {total_pages} ({len(results)} emails)",
+                "emails": results,
                 "pagination": {
-                    "current_page": page,
+                    "page": page,
                     "page_size": page_size,
-                    "total_pages": total_pages,
                     "total_count": total_count,
+                    "total_pages": total_pages,
                     "has_next": has_next,
                     "has_prev": has_prev,
-                    "showing_from": offset + 1 if results else 0,
-                    "showing_to": offset + len(results),
+                    "showing_count": len(results),
                 },
-                "filters": {
+                "filter": {
                     "headers_only": headers_only,
                     "unread_only": unread_only,
                     "reverse": reverse,
                 },
-                "emails": results,
             }
 
         except Exception as e:
             return f"Failed to list emails with pagination: {str(e)}"
 
-    # FOLDER STATISTICS
+    # FOLDER STATISTICS & ANALYTICS
     @mcp.tool()
-    async def get_folder_statistics(folder_name: str = ""):
+    async def get_folder_statistics(folder_name: str):
         """
-        Get comprehensive statistics for a folder.
+        Get comprehensive statistics for a specific folder.
 
         Args:
-            folder_name: Name of the folder to analyze (empty for current folder).
+            folder_name: The name of the folder to analyze.
         """
         state, error = get_state_or_error(mcp.get_context())
         if error:
             return error
 
         try:
+            if not state.mailbox.folder.exists(folder_name):
+                return f"Folder '{folder_name}' does not exist."
+
+            # Save current folder and switch to target folder
             current_folder = state.mailbox.folder.get()
-            target_folder = folder_name or current_folder
+            state.mailbox.folder.set(folder_name)
 
-            # Switch to target folder if needed
-            if folder_name and folder_name != current_folder:
-                if not state.mailbox.folder.exists(folder_name):
-                    return f"Folder '{folder_name}' does not exist."
-                state.mailbox.folder.set(folder_name)
+            # Get all message headers for analysis
+            messages = list(state.mailbox.fetch(headers_only=True))
+            total_count = len(messages)
 
-            # Get all emails with headers only for performance
-            all_messages = list(state.mailbox.fetch(headers_only=True))
-
-            # Initialize counters
-            stats = {
-                "folder_name": target_folder,
-                "total_messages": len(all_messages),
-                "unread_count": 0,
-                "read_count": 0,
-                "flagged_count": 0,
-                "draft_count": 0,
-                "answered_count": 0,
-                "deleted_count": 0,
-                "with_attachments": 0,
-                "total_size": 0,
-                "size_by_range": {
-                    "small": 0,  # < 100KB
-                    "medium": 0,  # 100KB - 1MB
-                    "large": 0,  # 1MB - 10MB
-                    "very_large": 0,  # > 10MB
-                },
-                "recent_activity": {
-                    "today": 0,
-                    "this_week": 0,
-                    "this_month": 0,
-                },
-                "top_senders": {},
-            }
-
-            from datetime import datetime, timedelta
-
-            now = datetime.now()
-            today = now.date()
-            week_ago = now - timedelta(days=7)
-            month_ago = now - timedelta(days=30)
-
-            # Analyze each message
-            for msg in all_messages:
-                # Count by flags
-                flags = set(msg.flags)
-                if MailMessageFlags.SEEN not in flags:
-                    stats["unread_count"] += 1
-                else:
-                    stats["read_count"] += 1
-
-                if MailMessageFlags.FLAGGED in flags:
-                    stats["flagged_count"] += 1
-                if MailMessageFlags.DRAFT in flags:
-                    stats["draft_count"] += 1
-                if MailMessageFlags.ANSWERED in flags:
-                    stats["answered_count"] += 1
-                if MailMessageFlags.DELETED in flags:
-                    stats["deleted_count"] += 1
-
-                # Count attachments
-                if len(msg.attachments) > 0:
-                    stats["with_attachments"] += 1
-
-                # Size analysis
-                size = msg.size
-                stats["total_size"] += size
-
-                if size < 100 * 1024:  # 100KB
-                    stats["size_by_range"]["small"] += 1
-                elif size < 1024 * 1024:  # 1MB
-                    stats["size_by_range"]["medium"] += 1
-                elif size < 10 * 1024 * 1024:  # 10MB
-                    stats["size_by_range"]["large"] += 1
-                else:
-                    stats["size_by_range"]["very_large"] += 1
-
-                # Recent activity
-                msg_date = msg.date
-                if msg_date:
-                    if msg_date.date() == today:
-                        stats["recent_activity"]["today"] += 1
-                    if msg_date >= week_ago:
-                        stats["recent_activity"]["this_week"] += 1
-                    if msg_date >= month_ago:
-                        stats["recent_activity"]["this_month"] += 1
-
-                # Top senders
-                sender = msg.from_
-                if sender:
-                    stats["top_senders"][sender] = (
-                        stats["top_senders"].get(sender, 0) + 1
-                    )
-
-            # Convert top senders to sorted list
-            top_senders_list = sorted(
-                stats["top_senders"].items(), key=lambda x: x[1], reverse=True
-            )[:10]  # Top 10 senders
-
-            stats["top_senders"] = [
-                {"sender": sender, "count": count} for sender, count in top_senders_list
-            ]
-
-            # Add calculated percentages
-            total = stats["total_messages"]
-            if total > 0:
-                stats["percentages"] = {
-                    "unread": round((stats["unread_count"] / total) * 100, 1),
-                    "flagged": round((stats["flagged_count"] / total) * 100, 1),
-                    "with_attachments": round(
-                        (stats["with_attachments"] / total) * 100, 1
-                    ),
+            if total_count == 0:
+                state.mailbox.folder.set(current_folder)
+                return {
+                    "folder_name": folder_name,
+                    "total_messages": 0,
+                    "message": "Folder is empty",
                 }
 
-            # Human readable size
-            def format_size(bytes_count):
-                for unit in ["B", "KB", "MB", "GB"]:
-                    if bytes_count < 1024.0:
-                        return f"{bytes_count:.1f} {unit}"
-                    bytes_count /= 1024.0
-                return f"{bytes_count:.1f} TB"
+            # Initialize counters
+            unread_count = 0
+            flagged_count = 0
+            deleted_count = 0
+            draft_count = 0
+            answered_count = 0
+            with_attachments = 0
+            total_size = 0
+            sender_counts = {}
 
-            stats["total_size_formatted"] = format_size(stats["total_size"])
-            stats["average_size_formatted"] = (
-                format_size(stats["total_size"] / total) if total > 0 else "0 B"
-            )
+            # Size distribution
+            size_ranges = {
+                "small": 0,  # < 100KB
+                "medium": 0,  # 100KB - 1MB
+                "large": 0,  # 1MB - 10MB
+                "very_large": 0,  # > 10MB
+            }
 
-            # Restore original folder
-            if folder_name and folder_name != current_folder:
-                state.mailbox.folder.set(current_folder)
+            # Recent activity counters
+            now = datetime.now()
+            today_count = 0
+            this_week_count = 0
+            this_month_count = 0
 
-            return stats
+            # Process each message
+            for msg in messages:
+                # Flag analysis
+                flags = set(msg.flags) if msg.flags else set()
+                if "\\Seen" not in flags:
+                    unread_count += 1
+                if "\\Flagged" in flags:
+                    flagged_count += 1
+                if "\\Deleted" in flags:
+                    deleted_count += 1
+                if "\\Draft" in flags:
+                    draft_count += 1
+                if "\\Answered" in flags:
+                    answered_count += 1
 
-        except Exception as e:
-            # Restore original folder on error
-            if folder_name and folder_name != current_folder:
-                try:
-                    state.mailbox.folder.set(current_folder)
-                except Exception:
-                    pass
-            return f"Failed to get folder statistics: {str(e)}"
+                # Attachment analysis
+                if len(msg.attachments) > 0:
+                    with_attachments += 1
 
-    @mcp.tool()
-    async def get_all_folders_statistics():
-        """Get statistics for all folders in the mailbox."""
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+                # Size analysis
+                msg_size = msg.size or 0
+                total_size += msg_size
 
-        try:
-            current_folder = state.mailbox.folder.get()
-            folders = state.mailbox.folder.list()
-            all_stats = []
+                if msg_size < 100_000:  # 100KB
+                    size_ranges["small"] += 1
+                elif msg_size < 1_000_000:  # 1MB
+                    size_ranges["medium"] += 1
+                elif msg_size < 10_000_000:  # 10MB
+                    size_ranges["large"] += 1
+                else:
+                    size_ranges["very_large"] += 1
 
-            for folder in folders:
-                try:
-                    # Get basic stats for each folder
-                    state.mailbox.folder.set(folder.name)
-                    messages = list(state.mailbox.fetch(headers_only=True))
+                # Sender analysis
+                sender = msg.from_ or "unknown"
+                sender_counts[sender] = sender_counts.get(sender, 0) + 1
 
-                    unread_count = sum(
-                        1 for msg in messages if MailMessageFlags.SEEN not in msg.flags
-                    )
+                # Recent activity analysis
+                if msg.date:
+                    try:
+                        # Convert to naive datetime if timezone-aware
+                        msg_date = msg.date
+                        if msg_date.tzinfo is not None:
+                            msg_date = msg_date.replace(tzinfo=None)
 
-                    total_size = sum(msg.size for msg in messages)
-                    with_attachments = sum(
-                        1 for msg in messages if len(msg.attachments) > 0
-                    )
+                        days_ago = (now - msg_date).days
+                        if days_ago == 0:
+                            today_count += 1
+                        if days_ago <= 7:
+                            this_week_count += 1
+                        if days_ago <= 30:
+                            this_month_count += 1
+                    except Exception:
+                        # Skip date analysis for this message if there's an error
+                        pass
 
-                    def format_size(bytes_count):
-                        for unit in ["B", "KB", "MB", "GB"]:
-                            if bytes_count < 1024.0:
-                                return f"{bytes_count:.1f} {unit}"
-                            bytes_count /= 1024.0
-                        return f"{bytes_count:.1f} TB"
-
-                    folder_stats = {
-                        "name": folder.name,
-                        "total_messages": len(messages),
-                        "unread_count": unread_count,
-                        "read_count": len(messages) - unread_count,
-                        "with_attachments": with_attachments,
-                        "total_size": total_size,
-                        "total_size_formatted": format_size(total_size),
-                        "delimiter": folder.delimiter,
-                        "flags": list(folder.flags) if hasattr(folder, "flags") else [],
-                    }
-
-                    all_stats.append(folder_stats)
-
-                except Exception as e:
-                    # Skip folders that can't be accessed
-                    all_stats.append(
-                        {
-                            "name": folder.name,
-                            "error": f"Could not access folder: {str(e)}",
-                        }
-                    )
+            # Top senders (limit to top 10)
+            top_senders = sorted(
+                sender_counts.items(), key=lambda x: x[1], reverse=True
+            )[:10]
 
             # Restore original folder
             state.mailbox.folder.set(current_folder)
 
-            # Calculate totals
-            total_messages = sum(
-                stats.get("total_messages", 0)
-                for stats in all_stats
-                if "error" not in stats
-            )
-            total_unread = sum(
-                stats.get("unread_count", 0)
-                for stats in all_stats
-                if "error" not in stats
-            )
-            total_size = sum(
-                stats.get("total_size", 0)
-                for stats in all_stats
-                if "error" not in stats
-            )
-
-            def format_size(bytes_count):
-                for unit in ["B", "KB", "MB", "GB"]:
-                    if bytes_count < 1024.0:
-                        return f"{bytes_count:.1f} {unit}"
-                    bytes_count /= 1024.0
-                return f"{bytes_count:.1f} TB"
-
             return {
-                "message": f"Statistics for {len(all_stats)} folders",
-                "summary": {
-                    "total_folders": len(all_stats),
-                    "total_messages": total_messages,
-                    "total_unread": total_unread,
-                    "total_size": total_size,
-                    "total_size_formatted": format_size(total_size),
+                "folder_name": folder_name,
+                "total_messages": total_count,
+                "message_flags": {
+                    "unread": unread_count,
+                    "read": total_count - unread_count,
+                    "flagged": flagged_count,
+                    "deleted": deleted_count,
+                    "draft": draft_count,
+                    "answered": answered_count,
                 },
-                "folders": all_stats,
+                "attachments": {
+                    "with_attachments": with_attachments,
+                    "without_attachments": total_count - with_attachments,
+                    "percentage_with_attachments": round(
+                        (with_attachments / total_count) * 100, 1
+                    ),
+                },
+                "size_analysis": {
+                    "total_size_bytes": total_size,
+                    "total_size_mb": round(total_size / (1024 * 1024), 2),
+                    "average_size_bytes": round(total_size / total_count)
+                    if total_count > 0
+                    else 0,
+                    "size_distribution": size_ranges,
+                },
+                "recent_activity": {
+                    "today": today_count,
+                    "this_week": this_week_count,
+                    "this_month": this_month_count,
+                },
+                "top_senders": [
+                    {"sender": sender, "count": count} for sender, count in top_senders
+                ],
             }
 
         except Exception as e:
-            # Restore original folder on error
-            try:
-                state.mailbox.folder.set(current_folder)
-            except Exception:
-                pass
+            return f"Failed to get folder statistics for '{folder_name}': {str(e)}"
+
+    @mcp.tool()
+    async def get_all_folders_statistics():
+        """
+        Get statistics for all folders in the mailbox.
+        """
+        state, error = get_state_or_error(mcp.get_context())
+        if error:
+            return error
+
+        try:
+            folders = state.mailbox.folder.list()
+            folder_stats = []
+            total_mailbox_messages = 0
+            total_mailbox_size = 0
+
+            for folder in folders:
+                # Skip folders that can't be selected
+                if folder.flags and "\\Noselect" in folder.flags:
+                    continue
+
+                try:
+                    # Get basic stats for each folder
+                    current_folder = state.mailbox.folder.get()
+                    state.mailbox.folder.set(folder.name)
+
+                    messages = list(state.mailbox.fetch(headers_only=True))
+                    message_count = len(messages)
+
+                    if message_count > 0:
+                        unread_count = len(
+                            [
+                                msg
+                                for msg in messages
+                                if "\\Seen" not in (msg.flags or [])
+                            ]
+                        )
+                        folder_size = sum(msg.size or 0 for msg in messages)
+
+                        folder_stats.append(
+                            {
+                                "name": folder.name,
+                                "total_messages": message_count,
+                                "unread_messages": unread_count,
+                                "read_messages": message_count - unread_count,
+                                "size_bytes": folder_size,
+                                "size_mb": round(folder_size / (1024 * 1024), 2),
+                                "average_message_size": round(
+                                    folder_size / message_count
+                                )
+                                if message_count > 0
+                                else 0,
+                            }
+                        )
+
+                        total_mailbox_messages += message_count
+                        total_mailbox_size += folder_size
+                    else:
+                        folder_stats.append(
+                            {
+                                "name": folder.name,
+                                "total_messages": 0,
+                                "unread_messages": 0,
+                                "read_messages": 0,
+                                "size_bytes": 0,
+                                "size_mb": 0,
+                                "average_message_size": 0,
+                            }
+                        )
+
+                    state.mailbox.folder.set(current_folder)
+
+                except Exception as e:
+                    # If we can't access a folder, skip it but log the error
+                    folder_stats.append(
+                        {
+                            "name": folder.name,
+                            "error": f"Cannot access folder: {str(e)}",
+                            "total_messages": 0,
+                            "unread_messages": 0,
+                            "read_messages": 0,
+                            "size_bytes": 0,
+                            "size_mb": 0,
+                            "average_message_size": 0,
+                        }
+                    )
+
+            # Sort by message count (descending)
+            folder_stats.sort(key=lambda x: x.get("total_messages", 0), reverse=True)
+
+            return {
+                "total_folders": len(folder_stats),
+                "mailbox_summary": {
+                    "total_messages": total_mailbox_messages,
+                    "total_size_bytes": total_mailbox_size,
+                    "total_size_mb": round(total_mailbox_size / (1024 * 1024), 2),
+                    "total_size_gb": round(
+                        total_mailbox_size / (1024 * 1024 * 1024), 2
+                    ),
+                    "average_message_size": round(
+                        total_mailbox_size / total_mailbox_messages
+                    )
+                    if total_mailbox_messages > 0
+                    else 0,
+                },
+                "folders": folder_stats,
+            }
+
+        except Exception as e:
             return f"Failed to get all folders statistics: {str(e)}"
 
-    # HEADER-ONLY OPERATIONS
+    # HEADERS-ONLY OPERATIONS
     @mcp.tool()
     async def get_email_headers(uid: str):
         """
-        Get only the headers of a specific email for fast preview.
+        Get just the headers of a specific email for quick preview.
 
         Args:
             uid: The UID of the email to get headers for.
@@ -700,8 +680,8 @@ def register_folder_tools(mcp: FastMCP):
             return error
 
         try:
-            # Fetch with headers only for performance
-            for msg in state.mailbox.fetch(AND(uid=uid), headers_only=True):
+            # Fetch just the headers
+            for msg in state.mailbox.fetch(f"UID {uid}", headers_only=True):
                 return {
                     "uid": msg.uid,
                     "from": msg.from_,
@@ -714,14 +694,12 @@ def register_folder_tools(mcp: FastMCP):
                     "flags": list(msg.flags),
                     "attachment_count": len(msg.attachments),
                     "message_id": msg.message_id,
-                    "in_reply_to": getattr(msg, "in_reply_to", None),
-                    "references": getattr(msg, "references", None),
                 }
 
             return f"Email with UID {uid} not found."
 
         except Exception as e:
-            return f"Failed to get email headers: {str(e)}"
+            return f"Failed to get email headers for UID {uid}: {str(e)}"
 
     @mcp.tool()
     async def batch_get_headers(uid_list: str):
@@ -729,44 +707,48 @@ def register_folder_tools(mcp: FastMCP):
         Get headers for multiple emails efficiently.
 
         Args:
-            uid_list: Comma-separated list of email UIDs.
+            uid_list: Comma-separated list of email UIDs to get headers for.
         """
         state, error = get_state_or_error(mcp.get_context())
         if error:
             return error
 
+        # Parse UID list
+        uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
+        if not uids:
+            return "No valid UIDs provided."
+
         try:
-            # Parse UID list
-            uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
-            if not uids:
-                return "No valid UIDs provided."
+            # Build UID search criteria
+            uid_criteria = " ".join(uids)
 
-            # Fetch headers for all UIDs at once
-            messages = state.mailbox.fetch(headers_only=True)
+            # Fetch headers for all UIDs in one go
+            messages = state.mailbox.fetch(f"UID {uid_criteria}", headers_only=True)
 
-            # Filter to only requested UIDs
             results = []
-            uid_set = set(uids)
             for msg in messages:
-                if msg.uid in uid_set:
-                    result = {
+                results.append(
+                    {
                         "uid": msg.uid,
                         "from": msg.from_,
                         "to": msg.to,
+                        "cc": msg.cc,
+                        "bcc": msg.bcc,
                         "subject": msg.subject,
                         "date": msg.date_str,
                         "size": msg.size,
                         "flags": list(msg.flags),
                         "attachment_count": len(msg.attachments),
+                        "message_id": msg.message_id,
                     }
-                    results.append(result)
+                )
 
             return {
-                "message": f"Retrieved headers for {len(results)} emails",
+                "message": f"Retrieved headers for {len(results)} out of {len(uids)} requested emails",
                 "requested_count": len(uids),
                 "found_count": len(results),
-                "emails": results,
+                "headers": results,
             }
 
         except Exception as e:
-            return f"Failed to batch get headers: {str(e)}"
+            return f"Failed to get batch headers: {str(e)}"

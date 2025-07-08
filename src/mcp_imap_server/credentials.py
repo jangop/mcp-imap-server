@@ -1,18 +1,17 @@
-"""Credential management for IMAP accounts using secure keyring storage."""
+"""IMAP credential management using secure keyring storage."""
 
-import tomllib
-import tomlkit
 import keyring
+import tomllib
+import tomli_w
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional, List, Dict
 from dataclasses import dataclass
-
-from platformdirs import user_config_dir
+import os
 
 
 @dataclass
 class AccountCredentials:
-    """Credentials for an IMAP account."""
+    """IMAP account credentials."""
 
     username: str
     password: str
@@ -20,69 +19,42 @@ class AccountCredentials:
 
 
 class CredentialManager:
-    """Manages IMAP account credentials with secure keyring password storage."""
+    """Manages IMAP credentials with secure keyring storage."""
 
-    def __init__(self):
-        """Initialize the credential manager."""
-        self.config_dir = Path(user_config_dir("mcp-imap-server", "mcp"))
-        self.config_file = self.config_dir / "accounts.toml"
-        self.config_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(self, config_file: Optional[str] = None):
+        self.config_file = config_file or str(
+            Path.home() / ".config" / "mcp-imap-server" / "config.toml"
+        )
         self.keyring_service = "mcp-imap-server"
 
+    def _ensure_config_dir(self) -> None:
+        """Ensure the config directory exists."""
+        config_path = Path(self.config_file)
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+
     def _read_config(self) -> Dict:
-        """Read the configuration file."""
-        if not self.config_file.exists():
+        """Read configuration from TOML file."""
+        if not os.path.exists(self.config_file):
             return {}
 
-        with open(self.config_file, "rb") as f:
-            return tomllib.load(f)
+        try:
+            with open(self.config_file, "rb") as f:
+                return tomllib.load(f)
+        except Exception:
+            return {}
 
     def _write_config(self, config: Dict) -> None:
-        """Write the configuration file using tomlkit."""
-        # Convert to tomlkit document for proper formatting
-        doc = tomlkit.document()
-
-        if "accounts" in config and config["accounts"]:
-            accounts_table = tomlkit.table()
-
-            for account_name, account_data in config["accounts"].items():
-                account_table = tomlkit.table()
-                account_table["username"] = account_data["username"]
-                account_table["server"] = account_data["server"]
-                # Note: passwords are stored in keyring, not in TOML
-
-                accounts_table[account_name] = account_table
-
-            doc["accounts"] = accounts_table
-
-        with open(self.config_file, "w") as f:
-            f.write(tomlkit.dumps(doc))
+        """Write configuration to TOML file."""
+        self._ensure_config_dir()
+        with open(self.config_file, "wb") as f:
+            tomli_w.dump(config, f)
 
     def _get_keyring_key(self, account_name: str) -> str:
-        """Generate keyring key for an account."""
-        return f"account.{account_name}"
+        """Get the keyring key for an account."""
+        return f"account:{account_name}"
 
-    def _migrate_plaintext_password(
-        self, account_name: str, plaintext_password: str
-    ) -> None:
-        """Migrate a plaintext password from TOML to keyring."""
-        try:
-            keyring.set_password(
-                self.keyring_service,
-                self._get_keyring_key(account_name),
-                plaintext_password,
-            )
-        except Exception as e:
-            raise RuntimeError(f"Failed to store password in keyring: {e}")
-
-    def add_account(self, name: str, username: str, password: str, server: str) -> None:
-        """Add or update an account's credentials."""
-        config = self._read_config()
-
-        if "accounts" not in config:
-            config["accounts"] = {}
-
-        # Store password securely in keyring
+    def _migrate_plaintext_password(self, name: str, password: str) -> None:
+        """Migrate a plaintext password to keyring storage."""
         try:
             keyring.set_password(
                 self.keyring_service, self._get_keyring_key(name), password
@@ -90,10 +62,38 @@ class CredentialManager:
         except Exception as e:
             raise RuntimeError(f"Failed to store password in keyring: {e}")
 
-        # Store account metadata in TOML (no password)
-        config["accounts"][name] = {"username": username, "server": server}
+    def add_account(self, name: str, username: str, password: str, server: str) -> None:
+        """Add or update an IMAP account."""
+        # Store password in keyring
+        try:
+            keyring.set_password(
+                self.keyring_service, self._get_keyring_key(name), password
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to store password in keyring: {e}")
 
-        self._write_config(config)
+        # Store account metadata in config file (without password)
+        config = self._read_config()
+
+        if "accounts" not in config:
+            config["accounts"] = {}
+
+        config["accounts"][name] = {
+            "username": username,
+            "server": server,
+        }
+
+        try:
+            self._write_config(config)
+        except Exception as e:
+            # Try to clean up keyring entry if config write fails
+            try:
+                keyring.delete_password(
+                    self.keyring_service, self._get_keyring_key(name)
+                )
+            except Exception:
+                pass
+            raise RuntimeError(f"Failed to save account config: {e}")
 
     def get_account(self, name: str) -> Optional[AccountCredentials]:
         """Get credentials for a specific account."""
@@ -183,5 +183,5 @@ class CredentialManager:
             return {"error": str(e)}
 
 
-# Global credential manager instance
+# Global instance
 credential_manager = CredentialManager()

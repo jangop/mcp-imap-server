@@ -29,6 +29,7 @@ def register_auth_tools(mcp: FastMCP):
     async def logout():
         """Log out of the IMAP server."""
         state = mcp.get_context().request_context.lifespan_context
+
         if not state.mailbox:
             return "Not logged in. Please login first."
 
@@ -40,8 +41,10 @@ def register_auth_tools(mcp: FastMCP):
     async def list_stored_accounts():
         """List all stored account names."""
         accounts = credential_manager.list_accounts()
+
         if not accounts:
             return "No accounts stored."
+
         return f"Stored accounts: {', '.join(accounts)}"
 
     @mcp.tool()
@@ -53,6 +56,7 @@ def register_auth_tools(mcp: FastMCP):
             account_name: The name of the stored account to use for login
         """
         credentials = credential_manager.get_account(account_name)
+
         if not credentials:
             return f"Account '{account_name}' not found. Use list_stored_accounts to see available accounts."
 

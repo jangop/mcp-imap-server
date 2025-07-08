@@ -24,10 +24,8 @@ def register_email_tools(mcp: FastMCP):
             return error
 
         if list_unread_only:
-            # Only fetch unread emails
             messages = state.mailbox.fetch(AND("UNSEEN"))
         else:
-            # Fetch all emails (don't use AND with empty criteria)
             messages = state.mailbox.fetch()
 
         return [
@@ -161,26 +159,17 @@ def register_email_tools(mcp: FastMCP):
         if error:
             return error
 
+        if min_size <= 0 and max_size <= 0:
+            return "Please specify min_size and/or max_size greater than 0."
+
         try:
-            # Build search criteria based on size constraints
-            criteria_parts = []
-
-            if min_size > 0:
-                criteria_parts.append(f"size_gt={min_size}")
-            if max_size > 0:
-                criteria_parts.append(f"size_lt={max_size}")
-
-            if not criteria_parts:
-                return "Please specify min_size and/or max_size greater than 0."
-
             # Create search criteria
-            if len(criteria_parts) == 1:
-                if min_size > 0:
-                    criteria = AND(size_gt=min_size)
-                else:
-                    criteria = AND(size_lt=max_size)
-            else:
+            if min_size > 0 and max_size > 0:
                 criteria = AND(size_gt=min_size, size_lt=max_size)
+            elif min_size > 0:
+                criteria = AND(size_gt=min_size)
+            else:
+                criteria = AND(size_lt=max_size)
 
             # Fetch messages
             messages = state.mailbox.fetch(criteria, headers_only=headers_only)
@@ -237,16 +226,17 @@ def register_email_tools(mcp: FastMCP):
         if error:
             return error
 
+        if not search_body and not search_subject:
+            return "Please enable search_body and/or search_subject."
+
         try:
             # Build search criteria
             if search_body and search_subject:
                 criteria = OR(body=search_text, subject=search_text)
             elif search_body:
                 criteria = AND(body=search_text)
-            elif search_subject:
-                criteria = AND(subject=search_text)
             else:
-                return "Please enable search_body and/or search_subject."
+                criteria = AND(subject=search_text)
 
             # Fetch messages
             messages = state.mailbox.fetch(criteria, headers_only=headers_only)
@@ -315,18 +305,20 @@ def register_email_tools(mcp: FastMCP):
             results = []
             for msg in messages:
                 attachment_count = len(msg.attachments)
-                if attachment_count >= min_attachments:
-                    result = {
-                        "uid": msg.uid,
-                        "from": msg.from_,
-                        "subject": msg.subject,
-                        "date": msg.date_str,
-                        "size": msg.size,
-                        "attachment_count": attachment_count,
-                    }
-                    if not headers_only:
-                        result.update({"text": msg.text, "html": msg.html})
-                    results.append(result)
+                if attachment_count < min_attachments:
+                    continue
+
+                result = {
+                    "uid": msg.uid,
+                    "from": msg.from_,
+                    "subject": msg.subject,
+                    "date": msg.date_str,
+                    "size": msg.size,
+                    "attachment_count": attachment_count,
+                }
+                if not headers_only:
+                    result.update({"text": msg.text, "html": msg.html})
+                results.append(result)
 
             return {
                 "message": f"Found {len(results)} emails with {min_attachments}+ attachments",
@@ -363,36 +355,34 @@ def register_email_tools(mcp: FastMCP):
         if error:
             return error
 
+        # Build search criteria based on flags
+        criteria_kwargs = {}
+        flag_descriptions = []
+
+        if seen is not None:
+            criteria_kwargs["seen"] = seen
+            flag_descriptions.append(f"{'read' if seen else 'unread'}")
+
+        if flagged is not None:
+            criteria_kwargs["flagged"] = flagged
+            flag_descriptions.append(f"{'flagged' if flagged else 'unflagged'}")
+
+        if deleted is not None:
+            criteria_kwargs["deleted"] = deleted
+            flag_descriptions.append(f"{'deleted' if deleted else 'not deleted'}")
+
+        if draft is not None:
+            criteria_kwargs["draft"] = draft
+            flag_descriptions.append(f"{'draft' if draft else 'not draft'}")
+
+        if answered is not None:
+            criteria_kwargs["answered"] = answered
+            flag_descriptions.append(f"{'answered' if answered else 'not answered'}")
+
+        if not criteria_kwargs:
+            return "Please specify at least one flag filter (seen, flagged, deleted, draft, answered)."
+
         try:
-            # Build search criteria based on flags
-            criteria_kwargs = {}
-            flag_descriptions = []
-
-            if seen is not None:
-                criteria_kwargs["seen"] = seen
-                flag_descriptions.append(f"{'read' if seen else 'unread'}")
-
-            if flagged is not None:
-                criteria_kwargs["flagged"] = flagged
-                flag_descriptions.append(f"{'flagged' if flagged else 'unflagged'}")
-
-            if deleted is not None:
-                criteria_kwargs["deleted"] = deleted
-                flag_descriptions.append(f"{'deleted' if deleted else 'not deleted'}")
-
-            if draft is not None:
-                criteria_kwargs["draft"] = draft
-                flag_descriptions.append(f"{'draft' if draft else 'not draft'}")
-
-            if answered is not None:
-                criteria_kwargs["answered"] = answered
-                flag_descriptions.append(
-                    f"{'answered' if answered else 'not answered'}"
-                )
-
-            if not criteria_kwargs:
-                return "Please specify at least one flag filter (seen, flagged, deleted, draft, answered)."
-
             # Create search criteria
             criteria = AND(**criteria_kwargs)
 
@@ -464,62 +454,60 @@ def register_email_tools(mcp: FastMCP):
         if error:
             return error
 
+        # Build search criteria
+        criteria_parts = []
+        search_description = []
+
+        if sender:
+            criteria_parts.append(AND(from_=sender))
+            search_description.append(f"from '{sender}'")
+
+        if subject:
+            criteria_parts.append(AND(subject=subject))
+            search_description.append(f"subject containing '{subject}'")
+
+        if body_text:
+            criteria_parts.append(AND(body=body_text))
+            search_description.append(f"body containing '{body_text}'")
+
+        if start_date:
+            try:
+                start = datetime.strptime(start_date, "%Y-%m-%d").date()
+                if end_date:
+                    end = datetime.strptime(end_date, "%Y-%m-%d").date()
+                    criteria_parts.append(AND(date_gte=start, date_lt=end))
+                    search_description.append(f"between {start_date} and {end_date}")
+                else:
+                    criteria_parts.append(AND(date=start))
+                    search_description.append(f"on {start_date}")
+            except ValueError:
+                return "Invalid date format. Use YYYY-MM-DD format."
+
+        if min_size > 0:
+            criteria_parts.append(AND(size_gt=min_size))
+            search_description.append(f"larger than {min_size} bytes")
+
+        if max_size > 0:
+            criteria_parts.append(AND(size_lt=max_size))
+            search_description.append(f"smaller than {max_size} bytes")
+
+        if is_unread is not None:
+            criteria_parts.append(AND(seen=not is_unread))
+            search_description.append("unread" if is_unread else "read")
+
+        if is_flagged is not None:
+            criteria_parts.append(AND(flagged=is_flagged))
+            search_description.append("flagged" if is_flagged else "unflagged")
+
+        if not criteria_parts:
+            return "Please specify at least one search criterion."
+
         try:
-            # Build search criteria
-            criteria_parts = []
-            search_description = []
-
-            if sender:
-                criteria_parts.append(AND(from_=sender))
-                search_description.append(f"from '{sender}'")
-
-            if subject:
-                criteria_parts.append(AND(subject=subject))
-                search_description.append(f"subject containing '{subject}'")
-
-            if body_text:
-                criteria_parts.append(AND(body=body_text))
-                search_description.append(f"body containing '{body_text}'")
-
-            if start_date:
-                try:
-                    start = datetime.strptime(start_date, "%Y-%m-%d").date()
-                    if end_date:
-                        end = datetime.strptime(end_date, "%Y-%m-%d").date()
-                        criteria_parts.append(AND(date_gte=start, date_lt=end))
-                        search_description.append(
-                            f"between {start_date} and {end_date}"
-                        )
-                    else:
-                        criteria_parts.append(AND(date=start))
-                        search_description.append(f"on {start_date}")
-                except ValueError:
-                    return "Invalid date format. Use YYYY-MM-DD format."
-
-            if min_size > 0:
-                criteria_parts.append(AND(size_gt=min_size))
-                search_description.append(f"larger than {min_size} bytes")
-
-            if max_size > 0:
-                criteria_parts.append(AND(size_lt=max_size))
-                search_description.append(f"smaller than {max_size} bytes")
-
-            if is_unread is not None:
-                criteria_parts.append(AND(seen=not is_unread))
-                search_description.append("unread" if is_unread else "read")
-
-            if is_flagged is not None:
-                criteria_parts.append(AND(flagged=is_flagged))
-                search_description.append("flagged" if is_flagged else "unflagged")
-
-            if not criteria_parts:
-                return "Please specify at least one search criterion."
-
             # Combine all criteria with AND
             if len(criteria_parts) == 1:
                 final_criteria = criteria_parts[0]
             else:
-                final_criteria = AND(*[c for c in criteria_parts])
+                final_criteria = AND(*criteria_parts)
 
             # Fetch messages
             messages = state.mailbox.fetch(final_criteria, headers_only=headers_only)
@@ -796,12 +784,12 @@ def register_email_tools(mcp: FastMCP):
         if error:
             return error
 
-        try:
-            # Parse UID list
-            uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
-            if not uids:
-                return "No valid UIDs provided."
+        # Parse UID list
+        uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
+        if not uids:
+            return "No valid UIDs provided."
 
+        try:
             # Mark as read in chunks for better performance
             state.mailbox.flag(uids, MailMessageFlags.SEEN, True, chunks=chunk_size)
 
@@ -828,12 +816,12 @@ def register_email_tools(mcp: FastMCP):
         if error:
             return error
 
-        try:
-            # Parse UID list
-            uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
-            if not uids:
-                return "No valid UIDs provided."
+        # Parse UID list
+        uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
+        if not uids:
+            return "No valid UIDs provided."
 
+        try:
             # Mark as unread in chunks
             state.mailbox.flag(uids, MailMessageFlags.SEEN, False, chunks=chunk_size)
 
@@ -860,12 +848,12 @@ def register_email_tools(mcp: FastMCP):
         if error:
             return error
 
-        try:
-            # Parse UID list
-            uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
-            if not uids:
-                return "No valid UIDs provided."
+        # Parse UID list
+        uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
+        if not uids:
+            return "No valid UIDs provided."
 
+        try:
             # Delete in chunks for better performance
             state.mailbox.delete(uids, chunks=chunk_size)
 
@@ -895,12 +883,12 @@ def register_email_tools(mcp: FastMCP):
         if error:
             return error
 
-        try:
-            # Parse UID list
-            uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
-            if not uids:
-                return "No valid UIDs provided."
+        # Parse UID list
+        uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
+        if not uids:
+            return "No valid UIDs provided."
 
+        try:
             # Check if destination folder exists, create it if it doesn't
             if not state.mailbox.folder.exists(destination_folder):
                 state.mailbox.folder.create(destination_folder)
@@ -935,12 +923,12 @@ def register_email_tools(mcp: FastMCP):
         if error:
             return error
 
-        try:
-            # Parse UID list
-            uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
-            if not uids:
-                return "No valid UIDs provided."
+        # Parse UID list
+        uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
+        if not uids:
+            return "No valid UIDs provided."
 
+        try:
             # Check if destination folder exists, create it if it doesn't
             if not state.mailbox.folder.exists(destination_folder):
                 state.mailbox.folder.create(destination_folder)
@@ -976,12 +964,12 @@ def register_email_tools(mcp: FastMCP):
         if error:
             return error
 
-        try:
-            # Parse UID list
-            uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
-            if not uids:
-                return "No valid UIDs provided."
+        # Parse UID list
+        uids = [uid.strip() for uid in uid_list.split(",") if uid.strip()]
+        if not uids:
+            return "No valid UIDs provided."
 
+        try:
             # Map common flag names to IMAP flags
             flag_mapping = {
                 "seen": MailMessageFlags.SEEN,
