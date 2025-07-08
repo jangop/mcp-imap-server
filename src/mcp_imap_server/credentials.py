@@ -1,8 +1,7 @@
 """IMAP credential management using secure keyring storage."""
 
 import keyring
-import tomllib
-import tomli_w
+import tomlkit
 from pathlib import Path
 from dataclasses import dataclass
 import os
@@ -37,16 +36,16 @@ class CredentialManager:
             return {}
 
         try:
-            with open(self.config_file, "rb") as f:
-                return tomllib.load(f)
+            with open(self.config_file, encoding="utf-8") as f:
+                return dict(tomlkit.load(f))
         except Exception:
             return {}
 
     def _write_config(self, config: dict) -> None:
         """Write configuration to TOML file."""
         self._ensure_config_dir()
-        with open(self.config_file, "wb") as f:
-            tomli_w.dump(config, f)
+        with open(self.config_file, "w", encoding="utf-8") as f:
+            tomlkit.dump(config, f)
 
     def _get_keyring_key(self, account_name: str) -> str:
         """Get the keyring key for an account."""
