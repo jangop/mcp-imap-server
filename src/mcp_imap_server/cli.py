@@ -4,16 +4,74 @@ import typer
 from rich.console import Console
 from rich.table import Table
 from rich import print as rprint
+from rich.progress import Progress, SpinnerColumn, TextColumn
+import socket
+from imap_tools import MailBox
 
-from .credentials import credential_manager
+from .credentials import credential_manager, CredentialError, PasswordNotFoundError
 
-app = typer.Typer(help="Manage IMAP account credentials for mcp-imap-server")
+app = typer.Typer(
+    help="Manage IMAP account credentials for mcp-imap-server", no_args_is_help=True
+)
 console = Console()
 
 
 def _exit_with_error() -> None:
     """Helper function to exit with error code 1."""
     raise typer.Exit(1)
+
+
+def _test_imap_connection(
+    username: str, password: str, server: str, timeout: int = 10
+) -> tuple[bool, str]:
+    """
+    Test IMAP connection with given credentials.
+
+    Returns:
+        tuple: (success: bool, message: str)
+    """
+    try:
+        # Try to connect and authenticate
+        with MailBox(server).login(username, password, initial_folder=None):
+            return True, "✅ Connection successful!"
+
+    except socket.gaierror:
+        return False, f"❌ Cannot resolve server: {server}"
+    except TimeoutError:
+        return False, f"❌ Connection timeout to {server}"
+    except ConnectionRefusedError:
+        return False, f"❌ Connection refused by {server}"
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "authentication failed" in error_msg or "login failed" in error_msg:
+            return False, "❌ Authentication failed - check username/password"
+        elif "certificate" in error_msg or "ssl" in error_msg:
+            return False, f"❌ SSL/TLS error: {e}"
+        elif "timeout" in error_msg:
+            return False, f"❌ Connection timeout: {e}"
+        else:
+            return False, f"❌ Connection failed: {e}"
+
+
+def _verify_credentials_with_progress(
+    username: str, password: str, server: str
+) -> bool:
+    """Test credentials with a progress spinner."""
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task(f"Testing connection to {server}...", total=None)
+
+        success, message = _test_imap_connection(username, password, server)
+
+        progress.update(task, description=message)
+        progress.stop()
+
+        rprint(message)
+        return success
 
 
 @app.command()
@@ -38,19 +96,18 @@ def list():
                 table.add_row(
                     account_name, credentials.username, credentials.server, "✓ Secure"
                 )
-        except RuntimeError as e:
-            if "Password not found in keyring" in str(e):
-                # Get account metadata without password
-                config = credential_manager._read_config()
-                account_data = config.get("accounts", {}).get(account_name, {})
-                table.add_row(
-                    account_name,
-                    account_data.get("username", "Unknown"),
-                    account_data.get("server", "Unknown"),
-                    "⚠ Missing",
-                )
-            else:
-                table.add_row(account_name, "Error", "Error", "✗ Error")
+        except PasswordNotFoundError:
+            # Get account metadata without password
+            config = credential_manager._read_config()
+            account_data = config.get("accounts", {}).get(account_name, {})
+            table.add_row(
+                account_name,
+                account_data.get("username", "Unknown"),
+                account_data.get("server", "Unknown"),
+                "⚠ Missing",
+            )
+        except CredentialError:
+            table.add_row(account_name, "Error", "Error", "✗ Error")
 
     console.print(table)
 
@@ -63,11 +120,10 @@ def list():
         try:
             credential_manager.get_account(account_name)
             working_accounts += 1
-        except RuntimeError as e:
-            if "Password not found in keyring" in str(e):
-                missing_passwords += 1
-            else:
-                error_accounts += 1
+        except PasswordNotFoundError:
+            missing_passwords += 1
+        except CredentialError:
+            error_accounts += 1
 
     rprint(
         f"\n[blue]Summary:[/blue] {working_accounts} working, {missing_passwords} missing passwords, {error_accounts} errors"
@@ -86,6 +142,11 @@ def add(
     ),
     server: str | None = typer.Option(
         None, "--server", "-s", help="IMAP server hostname"
+    ),
+    verify: bool = typer.Option(
+        True,
+        "--verify/--no-verify",
+        help="Test connection after adding credentials (default: True)",
     ),
 ):
     """Add a new IMAP account or update an existing one."""
@@ -116,8 +177,25 @@ def add(
 
         rprint("[dim]Password stored securely in system keyring[/dim]")
 
-    except RuntimeError as e:
-        rprint(f"[red]Keyring error: {e}[/red]")
+        # Verify credentials if requested
+        if verify:
+            rprint("\n[blue]Verifying credentials...[/blue]")
+            if _verify_credentials_with_progress(username, password, server):
+                rprint(
+                    "[green]✅ Account verification successful! Ready to use.[/green]"
+                )
+            else:
+                rprint("[yellow]⚠ Account saved but verification failed.[/yellow]")
+                rprint(
+                    "[yellow]You may want to check and update the credentials.[/yellow]"
+                )
+                if typer.confirm("Remove the account due to failed verification?"):
+                    credential_manager.remove_account(name)
+                    rprint(f"[yellow]Account '{name}' removed.[/yellow]")
+                    _exit_with_error()
+
+    except CredentialError as e:
+        rprint(f"[red]Credential error: {e}[/red]")
         rprint(
             "[yellow]Tip: Make sure you're logged into your system and keyring is available[/yellow]"
         )
@@ -141,6 +219,11 @@ def update(
     ),
     server: str | None = typer.Option(
         None, "--server", "-s", help="New IMAP server hostname"
+    ),
+    verify: bool = typer.Option(
+        True,
+        "--verify/--no-verify",
+        help="Test connection after updating credentials (default: True)",
     ),
 ):
     """Update an existing IMAP account."""
@@ -187,6 +270,21 @@ def update(
         credential_manager.add_account(name, new_username, new_password, new_server)
         rprint(f"[green]Account '{name}' updated successfully![/green]")
 
+        # Verify credentials if requested
+        if verify:
+            rprint("\n[blue]Verifying updated credentials...[/blue]")
+            if _verify_credentials_with_progress(
+                new_username, new_password, new_server
+            ):
+                rprint(
+                    "[green]✅ Account verification successful! Ready to use.[/green]"
+                )
+            else:
+                rprint("[yellow]⚠ Account updated but verification failed.[/yellow]")
+                rprint(
+                    "[yellow]You may want to check and update the credentials again.[/yellow]"
+                )
+
     except Exception as e:
         rprint(f"[red]Error updating account: {e}[/red]")
         raise typer.Exit(1) from None
@@ -202,15 +300,12 @@ def remove(
         # Check if account exists
         try:
             existing = credential_manager.get_account(name)
-        except RuntimeError as e:
-            if "Password not found in keyring" in str(e):
-                rprint(
-                    f"[yellow]Warning: Account '{name}' exists but password not found in keyring[/yellow]"
-                )
-                rprint("[yellow]Will remove account metadata anyway[/yellow]")
-                existing = None
-            else:
-                raise
+        except PasswordNotFoundError:
+            rprint(
+                f"[yellow]Warning: Account '{name}' exists but password not found in keyring[/yellow]"
+            )
+            rprint("[yellow]Will remove account metadata anyway[/yellow]")
+            existing = None
 
         if not existing and name not in credential_manager.list_accounts():
             rprint(f"[red]Account '{name}' not found.[/red]")
@@ -238,11 +333,50 @@ def remove(
             rprint(f"[red]Failed to remove account '{name}'.[/red]")
             _exit_with_error()
 
-    except RuntimeError as e:
-        rprint(f"[red]Keyring error: {e}[/red]")
+    except CredentialError as e:
+        rprint(f"[red]Credential error: {e}[/red]")
         raise typer.Exit(1) from None
     except Exception as e:
         rprint(f"[red]Error removing account: {e}[/red]")
+        raise typer.Exit(1) from None
+
+
+@app.command()
+def test(
+    name: str = typer.Argument(..., help="Account name to test"),
+):
+    """Test IMAP connection for an existing account."""
+    try:
+        # Get account credentials
+        account = credential_manager.get_account(name)
+        if not account:
+            rprint(f"[red]Account '{name}' not found.[/red]")
+            _exit_with_error()
+
+        rprint(f"[blue]Testing account '{name}'...[/blue]")
+        rprint(f"[dim]Server: {account.server}[/dim]")
+        rprint(f"[dim]Username: {account.username}[/dim]")
+
+        if _verify_credentials_with_progress(
+            account.username, account.password, account.server
+        ):
+            rprint(f"[green]✅ Account '{name}' is working correctly![/green]")
+        else:
+            rprint(f"[red]❌ Account '{name}' failed connection test.[/red]")
+            rprint(
+                "[yellow]Consider updating the credentials with: mcp-imap-credentials update[/yellow]"
+            )
+            _exit_with_error()
+
+    except PasswordNotFoundError:
+        rprint(f"[red]Password not found in keyring for account '{name}'.[/red]")
+        rprint("[yellow]Try running: mcp-imap-credentials migrate[/yellow]")
+        raise typer.Exit(1) from None
+    except CredentialError as e:
+        rprint(f"[red]Credential error: {e}[/red]")
+        raise typer.Exit(1) from None
+    except Exception as e:
+        rprint(f"[red]Error testing account: {e}[/red]")
         raise typer.Exit(1) from None
 
 
@@ -276,11 +410,10 @@ def info():
                 try:
                     credential_manager.get_account(account)
                     rprint(f"  ✓ {account}")
-                except RuntimeError as e:
-                    if "Password not found in keyring" in str(e):
-                        rprint(f"  ⚠ {account} (password missing)")
-                    else:
-                        rprint(f"  ✗ {account} (error)")
+                except PasswordNotFoundError:
+                    rprint(f"  ⚠ {account} (password missing)")
+                except CredentialError:
+                    rprint(f"  ✗ {account} (error)")
 
     except Exception as e:
         rprint(f"[red]Error getting info: {e}[/red]")

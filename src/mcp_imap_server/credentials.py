@@ -7,6 +7,36 @@ from dataclasses import dataclass
 import os
 
 
+class CredentialError(Exception):
+    """Base exception for credential management errors."""
+
+    pass
+
+
+class KeyringStorageError(CredentialError):
+    """Raised when keyring storage operations fail."""
+
+    pass
+
+
+class ConfigSaveError(CredentialError):
+    """Raised when configuration file save operations fail."""
+
+    pass
+
+
+class PasswordNotFoundError(CredentialError):
+    """Raised when password is not found in keyring."""
+
+    pass
+
+
+class KeyringRetrievalError(CredentialError):
+    """Raised when password retrieval from keyring fails."""
+
+    pass
+
+
 @dataclass
 class AccountCredentials:
     """IMAP account credentials."""
@@ -19,15 +49,9 @@ class AccountCredentials:
 class CredentialManager:
     """Manages IMAP credentials with secure keyring storage."""
 
-    # Error message constants
-    KEYRING_STORE_ERROR = "Keyring storage failed"
-    CONFIG_SAVE_ERROR = "Config save failed"
-    PASSWORD_NOT_FOUND = "Password not found"
-    KEYRING_RETRIEVE_ERROR = "Password retrieval failed"
-
     def _raise_password_not_found(self) -> None:
         """Helper function to raise password not found error."""
-        raise RuntimeError(self.PASSWORD_NOT_FOUND)
+        raise PasswordNotFoundError()
 
     def __init__(self, config_file: str | None = None):
         self.config_file = config_file or str(
@@ -68,7 +92,7 @@ class CredentialManager:
                 self.keyring_service, self._get_keyring_key(name), password
             )
         except Exception as e:
-            raise RuntimeError(self.KEYRING_STORE_ERROR) from e
+            raise KeyringStorageError() from e
 
     def add_account(self, name: str, username: str, password: str, server: str) -> None:
         """Add or update an IMAP account."""
@@ -78,7 +102,7 @@ class CredentialManager:
                 self.keyring_service, self._get_keyring_key(name), password
             )
         except Exception as e:
-            raise RuntimeError(self.KEYRING_STORE_ERROR) from e
+            raise KeyringStorageError() from e
 
         # Store account metadata in config file (without password)
         config = self._read_config()
@@ -101,7 +125,7 @@ class CredentialManager:
                 )
             except Exception:
                 pass
-            raise RuntimeError(self.CONFIG_SAVE_ERROR) from e
+            raise ConfigSaveError() from e
 
     def get_account(self, name: str) -> AccountCredentials | None:
         """Get credentials for a specific account."""
@@ -132,7 +156,7 @@ class CredentialManager:
                 if password is None:
                     self._raise_password_not_found()
             except Exception as e:
-                raise RuntimeError(self.KEYRING_RETRIEVE_ERROR) from e
+                raise KeyringRetrievalError() from e
 
         return AccountCredentials(
             username=account_data["username"],
