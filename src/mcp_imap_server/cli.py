@@ -11,6 +11,11 @@ app = typer.Typer(help="Manage IMAP account credentials for mcp-imap-server")
 console = Console()
 
 
+def _exit_with_error() -> None:
+    """Helper function to exit with error code 1."""
+    raise typer.Exit(1)
+
+
 @app.command()
 def list():
     """List all stored IMAP accounts."""
@@ -144,7 +149,7 @@ def update(
         existing = credential_manager.get_account(name)
         if not existing:
             rprint(f"[red]Account '{name}' not found.[/red]")
-            raise typer.Exit(1)
+            _exit_with_error()
 
         # Handle password prompting - check if --password flag was used
         import sys
@@ -209,7 +214,7 @@ def remove(
 
         if not existing and name not in credential_manager.list_accounts():
             rprint(f"[red]Account '{name}' not found.[/red]")
-            raise typer.Exit(1)
+            _exit_with_error()
 
         # Confirm removal unless --force is used
         if not force:
@@ -231,7 +236,7 @@ def remove(
             rprint("[dim]Password removed from system keyring[/dim]")
         else:
             rprint(f"[red]Failed to remove account '{name}'.[/red]")
-            raise typer.Exit(1)
+            _exit_with_error()
 
     except RuntimeError as e:
         rprint(f"[red]Keyring error: {e}[/red]")
@@ -333,5 +338,10 @@ def migrate():
         raise typer.Exit(1) from None
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Main entry point for the CLI application."""
     app()
+
+
+if __name__ == "__main__":
+    main()

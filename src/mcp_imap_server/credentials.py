@@ -19,6 +19,16 @@ class AccountCredentials:
 class CredentialManager:
     """Manages IMAP credentials with secure keyring storage."""
 
+    # Error message constants
+    KEYRING_STORE_ERROR = "Keyring storage failed"
+    CONFIG_SAVE_ERROR = "Config save failed"
+    PASSWORD_NOT_FOUND = "Password not found"
+    KEYRING_RETRIEVE_ERROR = "Password retrieval failed"
+
+    def _raise_password_not_found(self) -> None:
+        """Helper function to raise password not found error."""
+        raise RuntimeError(self.PASSWORD_NOT_FOUND)
+
     def __init__(self, config_file: str | None = None):
         self.config_file = config_file or str(
             Path.home() / ".config" / "mcp-imap-server" / "config.toml"
@@ -58,7 +68,7 @@ class CredentialManager:
                 self.keyring_service, self._get_keyring_key(name), password
             )
         except Exception as e:
-            raise RuntimeError(f"Failed to store password in keyring: {e}") from e
+            raise RuntimeError(self.KEYRING_STORE_ERROR) from e
 
     def add_account(self, name: str, username: str, password: str, server: str) -> None:
         """Add or update an IMAP account."""
@@ -68,7 +78,7 @@ class CredentialManager:
                 self.keyring_service, self._get_keyring_key(name), password
             )
         except Exception as e:
-            raise RuntimeError(f"Failed to store password in keyring: {e}") from e
+            raise RuntimeError(self.KEYRING_STORE_ERROR) from e
 
         # Store account metadata in config file (without password)
         config = self._read_config()
@@ -91,7 +101,7 @@ class CredentialManager:
                 )
             except Exception:
                 pass
-            raise RuntimeError(f"Failed to save account config: {e}") from e
+            raise RuntimeError(self.CONFIG_SAVE_ERROR) from e
 
     def get_account(self, name: str) -> AccountCredentials | None:
         """Get credentials for a specific account."""
@@ -120,13 +130,9 @@ class CredentialManager:
                     self.keyring_service, self._get_keyring_key(name)
                 )
                 if password is None:
-                    raise RuntimeError(
-                        f"Password not found in keyring for account '{name}'"
-                    )
+                    self._raise_password_not_found()
             except Exception as e:
-                raise RuntimeError(
-                    f"Failed to retrieve password from keyring: {e}"
-                ) from e
+                raise RuntimeError(self.KEYRING_RETRIEVE_ERROR) from e
 
         return AccountCredentials(
             username=account_data["username"],

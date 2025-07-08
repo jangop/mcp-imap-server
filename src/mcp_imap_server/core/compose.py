@@ -83,8 +83,7 @@ def register_compose_tools(mcp: FastMCP):
 
             # Append to the specified folder
             state.mailbox.append(message_bytes, folder, flag_set=flags)
-
-            return f"Email successfully created and saved to '{folder}' folder."
-
         except Exception as e:
             return f"Failed to create email: {e!s}"
+        else:
+            return f"Email successfully created and saved to '{folder}' folder."
