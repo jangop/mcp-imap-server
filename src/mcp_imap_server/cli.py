@@ -1,7 +1,6 @@
 """Command line interface for managing IMAP account credentials."""
 
 import typer
-from typing import Optional
 from rich.console import Console
 from rich.table import Table
 from rich import print as rprint
@@ -73,16 +72,14 @@ def list():
 @app.command()
 def add(
     name: str = typer.Argument(..., help="Account name (e.g., 'work', 'personal')"),
-    username: Optional[str] = typer.Option(
-        None, "--username", "-u", help="IMAP username"
-    ),
-    password: Optional[str] = typer.Option(
+    username: str | None = typer.Option(None, "--username", "-u", help="IMAP username"),
+    password: str | None = typer.Option(
         None,
         "--password",
         "-p",
         help="IMAP password (will prompt securely if not provided)",
     ),
-    server: Optional[str] = typer.Option(
+    server: str | None = typer.Option(
         None, "--server", "-s", help="IMAP server hostname"
     ),
 ):
@@ -119,25 +116,25 @@ def add(
         rprint(
             "[yellow]Tip: Make sure you're logged into your system and keyring is available[/yellow]"
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except Exception as e:
         rprint(f"[red]Error adding account: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
 def update(
     name: str = typer.Argument(..., help="Account name to update"),
-    username: Optional[str] = typer.Option(
+    username: str | None = typer.Option(
         None, "--username", "-u", help="New IMAP username"
     ),
-    password: Optional[str] = typer.Option(
+    password: str | None = typer.Option(
         None,
         "--password",
         "-p",
         help="New IMAP password (will prompt securely if flag is used)",
     ),
-    server: Optional[str] = typer.Option(
+    server: str | None = typer.Option(
         None, "--server", "-s", help="New IMAP server hostname"
     ),
 ):
@@ -187,7 +184,7 @@ def update(
 
     except Exception as e:
         rprint(f"[red]Error updating account: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -238,10 +235,10 @@ def remove(
 
     except RuntimeError as e:
         rprint(f"[red]Keyring error: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except Exception as e:
         rprint(f"[red]Error removing account: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -282,7 +279,7 @@ def info():
 
     except Exception as e:
         rprint(f"[red]Error getting info: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 @app.command()
@@ -333,7 +330,7 @@ def migrate():
 
     except Exception as e:
         rprint(f"[red]Migration error: {e}[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
 
 if __name__ == "__main__":

@@ -4,7 +4,6 @@ import keyring
 import tomllib
 import tomli_w
 from pathlib import Path
-from typing import Optional, List, Dict
 from dataclasses import dataclass
 import os
 
@@ -21,7 +20,7 @@ class AccountCredentials:
 class CredentialManager:
     """Manages IMAP credentials with secure keyring storage."""
 
-    def __init__(self, config_file: Optional[str] = None):
+    def __init__(self, config_file: str | None = None):
         self.config_file = config_file or str(
             Path.home() / ".config" / "mcp-imap-server" / "config.toml"
         )
@@ -32,7 +31,7 @@ class CredentialManager:
         config_path = Path(self.config_file)
         config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def _read_config(self) -> Dict:
+    def _read_config(self) -> dict:
         """Read configuration from TOML file."""
         if not os.path.exists(self.config_file):
             return {}
@@ -43,7 +42,7 @@ class CredentialManager:
         except Exception:
             return {}
 
-    def _write_config(self, config: Dict) -> None:
+    def _write_config(self, config: dict) -> None:
         """Write configuration to TOML file."""
         self._ensure_config_dir()
         with open(self.config_file, "wb") as f:
@@ -60,7 +59,7 @@ class CredentialManager:
                 self.keyring_service, self._get_keyring_key(name), password
             )
         except Exception as e:
-            raise RuntimeError(f"Failed to store password in keyring: {e}")
+            raise RuntimeError(f"Failed to store password in keyring: {e}") from e
 
     def add_account(self, name: str, username: str, password: str, server: str) -> None:
         """Add or update an IMAP account."""
@@ -70,7 +69,7 @@ class CredentialManager:
                 self.keyring_service, self._get_keyring_key(name), password
             )
         except Exception as e:
-            raise RuntimeError(f"Failed to store password in keyring: {e}")
+            raise RuntimeError(f"Failed to store password in keyring: {e}") from e
 
         # Store account metadata in config file (without password)
         config = self._read_config()
@@ -93,9 +92,9 @@ class CredentialManager:
                 )
             except Exception:
                 pass
-            raise RuntimeError(f"Failed to save account config: {e}")
+            raise RuntimeError(f"Failed to save account config: {e}") from e
 
-    def get_account(self, name: str) -> Optional[AccountCredentials]:
+    def get_account(self, name: str) -> AccountCredentials | None:
         """Get credentials for a specific account."""
         config = self._read_config()
 
@@ -126,7 +125,9 @@ class CredentialManager:
                         f"Password not found in keyring for account '{name}'"
                     )
             except Exception as e:
-                raise RuntimeError(f"Failed to retrieve password from keyring: {e}")
+                raise RuntimeError(
+                    f"Failed to retrieve password from keyring: {e}"
+                ) from e
 
         return AccountCredentials(
             username=account_data["username"],
@@ -134,7 +135,7 @@ class CredentialManager:
             server=account_data["server"],
         )
 
-    def list_accounts(self) -> List[str]:
+    def list_accounts(self) -> list[str]:
         """List all stored account names."""
         config = self._read_config()
 
@@ -170,7 +171,7 @@ class CredentialManager:
         self._write_config(config)
         return True
 
-    def get_keyring_info(self) -> Dict[str, str]:
+    def get_keyring_info(self) -> dict[str, str]:
         """Get information about the keyring backend being used."""
         try:
             backend = keyring.get_keyring()

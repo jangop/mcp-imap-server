@@ -63,13 +63,14 @@ def register_folder_tools(mcp: FastMCP):
             folder_info = []
 
             for folder in folders:
-                # Determine folder level based on separator
-                level = folder.name.count(folder.delimiter) if folder.delimiter else 0
+                # Determine folder level based on separator (use getattr with default)
+                delimiter = getattr(folder, "delimiter", "/")
+                level = folder.name.count(delimiter) if delimiter else 0
 
                 folder_data = {
                     "name": folder.name,
                     "flags": list(folder.flags) if folder.flags else [],
-                    "delimiter": folder.delimiter,
+                    "delimiter": delimiter,
                     "level": level,
                     "is_selectable": "\\Noselect" not in (folder.flags or []),
                     "has_children": "\\HasChildren" in (folder.flags or []),
@@ -137,7 +138,9 @@ def register_folder_tools(mcp: FastMCP):
                 "flags": list(folder_obj.flags)
                 if folder_obj and folder_obj.flags
                 else [],
-                "delimiter": folder_obj.delimiter if folder_obj else "/",
+                "delimiter": getattr(folder_obj, "delimiter", "/")
+                if folder_obj
+                else "/",
                 "is_selectable": folder_obj
                 and "\\Noselect" not in (folder_obj.flags or []),
                 "status": folder_status._asdict() if folder_status else {},
@@ -493,9 +496,10 @@ def register_folder_tools(mcp: FastMCP):
                 # Recent activity analysis
                 if msg.date:
                     try:
-                        # Convert to naive datetime if timezone-aware
+                        # Ensure both datetimes are timezone-naive for comparison
                         msg_date = msg.date
                         if msg_date.tzinfo is not None:
+                            # Convert timezone-aware to naive (assuming UTC)
                             msg_date = msg_date.replace(tzinfo=None)
 
                         days_ago = (now - msg_date).days
@@ -505,7 +509,7 @@ def register_folder_tools(mcp: FastMCP):
                             this_week_count += 1
                         if days_ago <= 30:
                             this_month_count += 1
-                    except Exception:
+                    except (TypeError, AttributeError):
                         # Skip date analysis for this message if there's an error
                         pass
 
@@ -628,37 +632,38 @@ def register_folder_tools(mcp: FastMCP):
                     state.mailbox.folder.set(current_folder)
 
                 except Exception as e:
-                    # If we can't access a folder, skip it but log the error
+                    # If we can't access a folder, add it with error info but don't fail completely
                     folder_stats.append(
                         {
-                            "name": folder.name,
-                            "error": f"Cannot access folder: {str(e)}",
-                            "total_messages": 0,
-                            "unread_messages": 0,
-                            "read_messages": 0,
-                            "size_bytes": 0,
-                            "size_mb": 0,
-                            "average_message_size": 0,
+                            "name": getattr(folder, "name", "unknown"),
+                            "error": f"Could not access folder: {str(e)}",
                         }
                     )
+                    # Try to restore current folder if possible
+                    try:
+                        state.mailbox.folder.set(current_folder)
+                    except Exception:
+                        pass
 
             # Sort by message count (descending)
             folder_stats.sort(key=lambda x: x.get("total_messages", 0), reverse=True)
 
             return {
-                "total_folders": len(folder_stats),
-                "mailbox_summary": {
+                "message": f"Statistics for {len(folder_stats)} folders",
+                "summary": {
+                    "total_folders": len(folder_stats),
                     "total_messages": total_mailbox_messages,
-                    "total_size_bytes": total_mailbox_size,
-                    "total_size_mb": round(total_mailbox_size / (1024 * 1024), 2),
-                    "total_size_gb": round(
-                        total_mailbox_size / (1024 * 1024 * 1024), 2
+                    "total_unread": sum(
+                        f.get("unread_messages", 0)
+                        for f in folder_stats
+                        if "error" not in f
                     ),
-                    "average_message_size": round(
-                        total_mailbox_size / total_mailbox_messages
-                    )
-                    if total_mailbox_messages > 0
-                    else 0,
+                    "total_size": total_mailbox_size,
+                    "total_size_formatted": f"{total_mailbox_size / (1024 * 1024):.1f} MB"
+                    if total_mailbox_size > 1024 * 1024
+                    else f"{total_mailbox_size / 1024:.1f} KB"
+                    if total_mailbox_size > 1024
+                    else f"{total_mailbox_size:.1f} B",
                 },
                 "folders": folder_stats,
             }
