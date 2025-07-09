@@ -28,7 +28,8 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             uid_str = ",".join(str(uid) for uid in uids)
 
             # Mark as read using IMAP command
-            state.mailbox.mail.store(uid_str, "+FLAGS", r"(\Seen)")
+            # Use the MailBox object directly instead of accessing .mail
+            state.mailbox.store(uid_str, "+FLAGS", r"(\Seen)")
 
             return {
                 "message": f"Successfully marked {len(uids)} emails as read",
@@ -60,7 +61,8 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             uid_str = ",".join(str(uid) for uid in uids)
 
             # Mark as unread using IMAP command
-            state.mailbox.mail.store(uid_str, "-FLAGS", r"(\Seen)")
+            # Use the MailBox object directly instead of accessing .mail
+            state.mailbox.store(uid_str, "-FLAGS", r"(\Seen)")
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to mark emails as unread: {e!s}"
         else:
@@ -92,7 +94,8 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             uid_str = ",".join(str(uid) for uid in uids)
 
             # Mark as deleted using IMAP command
-            state.mailbox.mail.store(uid_str, "+FLAGS", r"(\Deleted)")
+            # Use the MailBox object directly instead of accessing .mail
+            state.mailbox.store(uid_str, "+FLAGS", r"(\Deleted)")
 
             result = {
                 "message": f"Successfully marked {len(uids)} emails for deletion",
@@ -104,7 +107,7 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
 
             # Expunge if requested
             if expunge:
-                state.mailbox.mail.expunge()
+                state.mailbox.expunge()
                 result["message"] = (
                     f"Successfully deleted {len(uids)} emails permanently"
                 )
@@ -135,13 +138,14 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             uid_str = ",".join(str(uid) for uid in uids)
 
             # Copy to destination folder
-            state.mailbox.mail.copy(uid_str, destination_folder)
+            # Use the MailBox object directly instead of accessing .mail
+            state.mailbox.copy(uid_str, destination_folder)
 
             # Mark original messages as deleted
-            state.mailbox.mail.store(uid_str, "+FLAGS", r"(\Deleted)")
+            state.mailbox.store(uid_str, "+FLAGS", r"(\Deleted)")
 
             # Expunge to complete the move
-            state.mailbox.mail.expunge()
+            state.mailbox.expunge()
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to move emails: {e!s}"
         else:
@@ -174,7 +178,7 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             uid_str = ",".join(str(uid) for uid in uids)
 
             # Copy to destination folder
-            state.mailbox.mail.copy(uid_str, destination_folder)
+            state.mailbox.copy(uid_str, destination_folder)
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to copy emails: {e!s}"
         else:
@@ -222,13 +226,15 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             # Add flags
             if add_flags:
                 flags_str = " ".join(add_flags)
-                state.mailbox.mail.store(uid_str, "+FLAGS", f"({flags_str})")
+                # Use the MailBox object directly instead of accessing .mail
+                state.mailbox.store(uid_str, "+FLAGS", f"({flags_str})")
                 operations.append(f"added flags: {', '.join(add_flags)}")
 
             # Remove flags
             if remove_flags:
                 flags_str = " ".join(remove_flags)
-                state.mailbox.mail.store(uid_str, "-FLAGS", f"({flags_str})")
+                # Use the MailBox object directly instead of accessing .mail
+                state.mailbox.store(uid_str, "-FLAGS", f"({flags_str})")
                 operations.append(f"removed flags: {', '.join(remove_flags)}")
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to modify email flags: {e!s}"

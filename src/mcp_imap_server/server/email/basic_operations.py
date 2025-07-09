@@ -323,7 +323,8 @@ def register_email_basic_operations_tools(mcp: FastMCP):
 
         try:
             # Mark as read using IMAP command
-            state.mailbox.mail.store(str(uid), "+FLAGS", r"(\Seen)")
+            # Use the MailBox object directly instead of accessing .mail
+            state.mailbox.store(str(uid), "+FLAGS", r"(\Seen)")
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to mark email as read: {e!s}"
         else:
@@ -348,7 +349,8 @@ def register_email_basic_operations_tools(mcp: FastMCP):
 
         try:
             # Mark as deleted using IMAP command
-            state.mailbox.mail.store(str(uid), "+FLAGS", r"(\Deleted)")
+            # Use the MailBox object directly instead of accessing .mail
+            state.mailbox.store(str(uid), "+FLAGS", r"(\Deleted)")
 
             result = {
                 "message": f"Successfully marked email UID {uid} for deletion",
@@ -359,7 +361,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
 
             # Expunge if requested
             if expunge:
-                state.mailbox.mail.expunge()
+                state.mailbox.expunge()
                 result["message"] = f"Successfully deleted email UID {uid} permanently"
                 result["expunged"] = True
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
