@@ -29,8 +29,8 @@ def register_folder_statistics_tools(mcp: FastMCP):
                 original_folder = state.mailbox.folder
                 state.mailbox.folder.set(folder_name)
 
-                # Get statistics for the specific folder
-                messages = state.mailbox.fetch()
+                # Get statistics for the specific folder - convert generator to list
+                messages = list(state.mailbox.fetch())
                 total_messages = len(messages)
 
                 # Count read/unread messages
@@ -73,7 +73,7 @@ def register_folder_statistics_tools(mcp: FastMCP):
                 for folder in folders:
                     try:
                         state.mailbox.folder.set(folder)
-                        messages = state.mailbox.fetch()
+                        messages = list(state.mailbox.fetch())
                         total_messages += len(messages)
 
                         for msg in messages:

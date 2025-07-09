@@ -43,8 +43,8 @@ def register_folder_pagination_tools(mcp: FastMCP):
             else:
                 folder_name = original_folder
 
-            # Get total count first
-            all_uids = list(state.mailbox.uids())
+            # Get total count first - use uids() to get all UIDs
+            all_uids = state.mailbox.uids()
             total_emails = len(all_uids)
 
             # Calculate pagination
@@ -68,9 +68,11 @@ def register_folder_pagination_tools(mcp: FastMCP):
             # Get UIDs for this page
             page_uids = all_uids[start_idx:end_idx]
 
-            # Fetch messages for this page
+            # Fetch messages for this page using UID criteria
+            # Convert UIDs to string format for search criteria
+            uid_criteria = " OR ".join([f"UID {uid}" for uid in page_uids])
             page_messages = list(
-                state.mailbox.fetch(page_uids, headers_only=headers_only)
+                state.mailbox.fetch(uid_criteria, headers_only=headers_only)
             )
 
             # Format results

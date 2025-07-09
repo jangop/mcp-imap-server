@@ -1,7 +1,7 @@
 """Email basic operations tools for IMAP server."""
 
 import imaplib
-from datetime import datetime
+from datetime import datetime, UTC
 from imap_tools import AND
 from mcp.server.fastmcp import FastMCP
 from ..state import get_state_or_error
@@ -27,10 +27,18 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             # Fetch all messages to sort by date, then take the most recent
             all_messages = list(state.mailbox.fetch(headers_only=headers_only))
 
-            # Sort by date (most recent first)
+            # Sort by date (most recent first) - handle timezone-aware dates properly
+            def get_sort_date(msg):
+                if msg.date is None:
+                    return datetime.min.replace(tzinfo=UTC)
+                # If date is timezone-naive, assume UTC
+                if msg.date.tzinfo is None:
+                    return msg.date.replace(tzinfo=UTC)
+                return msg.date
+
             sorted_messages = sorted(
                 all_messages,
-                key=lambda msg: msg.date if msg.date else datetime.min,
+                key=lambda msg: get_sort_date(msg),
                 reverse=True,
             )
 
@@ -202,10 +210,18 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             # Fetch all messages to sort by date, then take the most recent
             all_messages = list(state.mailbox.fetch(headers_only=headers_only))
 
-            # Sort by date (most recent first)
+            # Sort by date (most recent first) - handle timezone-aware dates properly
+            def get_sort_date(msg):
+                if msg.date is None:
+                    return datetime.min.replace(tzinfo=UTC)
+                # If date is timezone-naive, assume UTC
+                if msg.date.tzinfo is None:
+                    return msg.date.replace(tzinfo=UTC)
+                return msg.date
+
             sorted_messages = sorted(
                 all_messages,
-                key=lambda msg: msg.date if msg.date else datetime.min,
+                key=lambda msg: get_sort_date(msg),
                 reverse=True,
             )
 
@@ -257,9 +273,9 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             return error
 
         try:
-            # Get the specific message
+            # Get the specific message using UID criteria
             message = None
-            for msg in state.mailbox.fetch([uid]):
+            for msg in state.mailbox.fetch(f"UID {uid}"):
                 message = msg
                 break
 

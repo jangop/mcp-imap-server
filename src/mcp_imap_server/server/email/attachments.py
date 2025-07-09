@@ -27,9 +27,9 @@ def register_email_attachment_tools(mcp: FastMCP):
             return error
 
         try:
-            # Get the specific message
+            # Get the specific message using UID criteria
             message = None
-            for msg in state.mailbox.fetch([uid]):
+            for msg in state.mailbox.fetch(f"UID {uid}"):
                 message = msg
                 break
 
@@ -139,9 +139,9 @@ def register_email_attachment_tools(mcp: FastMCP):
             return error
 
         try:
-            # Get the specific message
+            # Get the specific message using UID criteria
             message = None
-            for msg in state.mailbox.fetch([uid]):
+            for msg in state.mailbox.fetch(f"UID {uid}"):
                 message = msg
                 break
 
