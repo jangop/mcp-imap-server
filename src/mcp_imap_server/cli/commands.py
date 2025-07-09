@@ -236,9 +236,10 @@ def test_imap_account(email: str) -> str:
             mail = imaplib.IMAP4(imap_server, imap_port)
         mail.login(account.username, account.password)
         mail.logout()
-        return "OK"
     except Exception as e:
         return f"FAILED: {e.__class__.__name__}"  # Short error
+    else:
+        return "OK"
 
 
 def test_imap_connection(
