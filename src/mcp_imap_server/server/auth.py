@@ -5,7 +5,7 @@ import ssl
 from imap_tools import MailBox
 from mcp.server.fastmcp import FastMCP
 
-from ..credentials import credential_manager
+from ..shared.credentials import credential_manager
 
 
 def register_auth_tools(mcp: FastMCP):
