@@ -83,6 +83,7 @@ def list_imap_accounts(test: bool = True):
     """List all configured IMAP accounts, print a table, and test connections unless --no-test is passed."""
     from rich.table import Table
     from rich.console import Console
+    from rich.progress import Progress, SpinnerColumn, TextColumn
 
     cred_manager = CredentialManager()
     accounts = cred_manager.list_accounts()
@@ -94,29 +95,70 @@ def list_imap_accounts(test: bool = True):
     table.add_column("SSL")
     table.add_column("Status")
 
-    for email in accounts:
-        account = cred_manager.get_account(email)
-        if account:
-            # Parse server info
-            try:
-                server_parts = account.server.split(":")
-                imap_server = server_parts[0]
-                imap_port = str(server_parts[1]) if len(server_parts) > 1 else "993"
-                use_ssl = (
-                    server_parts[2].lower() == "true" if len(server_parts) > 2 else True
+    # Test accounts with progress indicator
+    if test and accounts:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Testing accounts...", total=len(accounts))
+            for email in accounts:
+                progress.update(task, description=f"Testing {email}...")
+                account = cred_manager.get_account(email)
+                if account:
+                    # Parse server info
+                    try:
+                        server_parts = account.server.split(":")
+                        imap_server = server_parts[0]
+                        imap_port = (
+                            str(server_parts[1]) if len(server_parts) > 1 else "993"
+                        )
+                        use_ssl = (
+                            server_parts[2].lower() == "true"
+                            if len(server_parts) > 2
+                            else True
+                        )
+                    except Exception:
+                        imap_server = account.server
+                        imap_port = "?"
+                        use_ssl = True
+                    status = test_imap_account(email)
+                    table.add_row(
+                        email,
+                        imap_server,
+                        imap_port,
+                        "Yes" if use_ssl else "No",
+                        status,
+                    )
+                else:
+                    table.add_row(email, "?", "?", "?", "NOT FOUND")
+                progress.advance(task)
+    else:
+        # No testing or no accounts
+        for email in accounts:
+            account = cred_manager.get_account(email)
+            if account:
+                # Parse server info
+                try:
+                    server_parts = account.server.split(":")
+                    imap_server = server_parts[0]
+                    imap_port = str(server_parts[1]) if len(server_parts) > 1 else "993"
+                    use_ssl = (
+                        server_parts[2].lower() == "true"
+                        if len(server_parts) > 2
+                        else True
+                    )
+                except Exception:
+                    imap_server = account.server
+                    imap_port = "?"
+                    use_ssl = True
+                status = "-"
+                table.add_row(
+                    email, imap_server, imap_port, "Yes" if use_ssl else "No", status
                 )
-            except Exception:
-                imap_server = account.server
-                imap_port = "?"
-                use_ssl = True
-            status = "-"
-            if test:
-                status = test_imap_account(email)
-            table.add_row(
-                email, imap_server, imap_port, "Yes" if use_ssl else "No", status
-            )
-        else:
-            table.add_row(email, "?", "?", "?", "NOT FOUND")
+            else:
+                table.add_row(email, "?", "?", "?", "NOT FOUND")
     console.print(table)
 
 
