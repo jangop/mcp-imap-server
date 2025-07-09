@@ -1,6 +1,7 @@
 """Email basic operations tools for IMAP server."""
 
 import imaplib
+from datetime import datetime
 from imap_tools import AND
 from mcp.server.fastmcp import FastMCP
 from ..state import get_state_or_error
@@ -23,11 +24,21 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             return error
 
         try:
-            # Fetch messages with limit
-            messages = state.mailbox.fetch(limit=limit, headers_only=headers_only)
+            # Fetch all messages to sort by date, then take the most recent
+            all_messages = list(state.mailbox.fetch(headers_only=headers_only))
+
+            # Sort by date (most recent first)
+            sorted_messages = sorted(
+                all_messages,
+                key=lambda msg: msg.date if msg.date else datetime.min,
+                reverse=True,
+            )
+
+            # Take the most recent ones
+            recent_messages = sorted_messages[:limit]
 
             results = []
-            for msg in messages:
+            for msg in recent_messages:
                 result = {
                     "uid": msg.uid,
                     "from": msg.from_,
@@ -188,11 +199,21 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             return error
 
         try:
-            # Fetch messages with limit
-            messages = state.mailbox.fetch(limit=count, headers_only=headers_only)
+            # Fetch all messages to sort by date, then take the most recent
+            all_messages = list(state.mailbox.fetch(headers_only=headers_only))
+
+            # Sort by date (most recent first)
+            sorted_messages = sorted(
+                all_messages,
+                key=lambda msg: msg.date if msg.date else datetime.min,
+                reverse=True,
+            )
+
+            # Take the most recent ones
+            recent_messages = sorted_messages[:count]
 
             results = []
-            for msg in messages:
+            for msg in recent_messages:
                 result = {
                     "uid": msg.uid,
                     "from": msg.from_,
