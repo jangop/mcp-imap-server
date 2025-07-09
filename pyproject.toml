@@ -3,6 +3,7 @@ name = "mcp-imap-server"
 version = "0.1.0"
 description = "A comprehensive Model Context Protocol (MCP) server for full-featured IMAP email management with advanced search, bulk operations, and secure credential storage"
 readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.13"
 dependencies = [
     "imap-tools>=1.11.0",
