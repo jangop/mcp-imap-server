@@ -6,6 +6,8 @@ from rich.table import Table
 from rich import print as rprint
 from rich.progress import Progress, SpinnerColumn, TextColumn
 import socket
+import ssl
+import imaplib
 from imap_tools import MailBox
 
 from .credentials import credential_manager, CredentialError, PasswordNotFoundError
@@ -41,11 +43,15 @@ def _test_imap_connection(
         return False, f"❌ Connection timeout to {server}"
     except ConnectionRefusedError:
         return False, f"❌ Connection refused by {server}"
-    except Exception as e:
+    except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
         error_msg = str(e).lower()
         if "authentication failed" in error_msg or "login failed" in error_msg:
             return False, "❌ Authentication failed - check username/password"
-        elif "certificate" in error_msg or "ssl" in error_msg:
+        else:
+            return False, f"❌ IMAP error: {e}"
+    except (OSError, ssl.SSLError) as e:
+        error_msg = str(e).lower()
+        if "certificate" in error_msg or "ssl" in error_msg:
             return False, f"❌ SSL/TLS error: {e}"
         elif "timeout" in error_msg:
             return False, f"❌ Connection timeout: {e}"
@@ -200,7 +206,7 @@ def add(
             "[yellow]Tip: Make sure you're logged into your system and keyring is available[/yellow]"
         )
         raise typer.Exit(1) from None
-    except Exception as e:
+    except (ValueError, OSError) as e:
         rprint(f"[red]Error adding account: {e}[/red]")
         raise typer.Exit(1) from None
 
@@ -285,7 +291,7 @@ def update(
                     "[yellow]You may want to check and update the credentials again.[/yellow]"
                 )
 
-    except Exception as e:
+    except (ValueError, OSError, CredentialError) as e:
         rprint(f"[red]Error updating account: {e}[/red]")
         raise typer.Exit(1) from None
 
@@ -336,7 +342,7 @@ def remove(
     except CredentialError as e:
         rprint(f"[red]Credential error: {e}[/red]")
         raise typer.Exit(1) from None
-    except Exception as e:
+    except (ValueError, OSError) as e:
         rprint(f"[red]Error removing account: {e}[/red]")
         raise typer.Exit(1) from None
 
@@ -375,7 +381,7 @@ def test(
     except CredentialError as e:
         rprint(f"[red]Credential error: {e}[/red]")
         raise typer.Exit(1) from None
-    except Exception as e:
+    except (ValueError, OSError) as e:
         rprint(f"[red]Error testing account: {e}[/red]")
         raise typer.Exit(1) from None
 
@@ -415,7 +421,7 @@ def info():
                 except CredentialError:
                     rprint(f"  ✗ {account} (error)")
 
-    except Exception as e:
+    except (ValueError, OSError, CredentialError) as e:
         rprint(f"[red]Error getting info: {e}[/red]")
         raise typer.Exit(1) from None
 
@@ -456,7 +462,7 @@ def migrate():
                 credential_manager.get_account(account_name)
                 migrated += 1
                 rprint(f"[green]✓ Migrated: {account_name}[/green]")
-            except Exception as e:
+            except (CredentialError, ValueError, OSError) as e:
                 rprint(f"[red]✗ Failed to migrate {account_name}: {e}[/red]")
 
         rprint(
@@ -466,7 +472,7 @@ def migrate():
             "[dim]Plain-text passwords have been removed from the config file.[/dim]"
         )
 
-    except Exception as e:
+    except (ValueError, OSError, CredentialError) as e:
         rprint(f"[red]Migration error: {e}[/red]")
         raise typer.Exit(1) from None
 

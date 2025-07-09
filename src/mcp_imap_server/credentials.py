@@ -1,6 +1,7 @@
 """IMAP credential management using secure keyring storage."""
 
 import keyring
+import keyring.errors
 import tomlkit
 from pathlib import Path
 from dataclasses import dataclass
@@ -72,7 +73,7 @@ class CredentialManager:
         try:
             with open(self.config_file, encoding="utf-8") as f:
                 return dict(tomlkit.load(f))
-        except Exception:
+        except (OSError, PermissionError, ValueError):
             return {}
 
     def _write_config(self, config: dict) -> None:
@@ -91,7 +92,7 @@ class CredentialManager:
             keyring.set_password(
                 self.keyring_service, self._get_keyring_key(name), password
             )
-        except Exception as e:
+        except keyring.errors.PasswordSetError as e:
             raise KeyringStorageError() from e
 
     def add_account(self, name: str, username: str, password: str, server: str) -> None:
@@ -101,7 +102,7 @@ class CredentialManager:
             keyring.set_password(
                 self.keyring_service, self._get_keyring_key(name), password
             )
-        except Exception as e:
+        except keyring.errors.PasswordSetError as e:
             raise KeyringStorageError() from e
 
         # Store account metadata in config file (without password)
@@ -117,13 +118,13 @@ class CredentialManager:
 
         try:
             self._write_config(config)
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             # Try to clean up keyring entry if config write fails
             try:
                 keyring.delete_password(
                     self.keyring_service, self._get_keyring_key(name)
                 )
-            except Exception:
+            except (keyring.errors.PasswordDeleteError, keyring.errors.KeyringError):
                 pass
             raise ConfigSaveError() from e
 
@@ -155,7 +156,7 @@ class CredentialManager:
                 )
                 if password is None:
                     self._raise_password_not_found()
-            except Exception as e:
+            except (keyring.errors.KeyringError, keyring.errors.InitError) as e:
                 raise KeyringRetrievalError() from e
 
         return AccountCredentials(
@@ -186,7 +187,7 @@ class CredentialManager:
         except keyring.errors.PasswordDeleteError:
             # Password wasn't in keyring (maybe legacy account), continue anyway
             pass
-        except Exception as e:
+        except (keyring.errors.KeyringError, keyring.errors.InitError) as e:
             # Log the warning but don't fail the removal
             print(f"Warning: Failed to remove password from keyring: {e}")
 
@@ -209,7 +210,7 @@ class CredentialManager:
                 "name": getattr(backend, "name", "Unknown"),
                 "priority": str(getattr(backend, "priority", "Unknown")),
             }
-        except Exception as e:
+        except (keyring.errors.KeyringError, keyring.errors.InitError) as e:
             return {"error": str(e)}
 
 

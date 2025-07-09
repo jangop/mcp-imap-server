@@ -1,5 +1,7 @@
 """Authentication tools for IMAP server."""
 
+import imaplib
+import ssl
 from imap_tools import MailBox
 from mcp.server.fastmcp import FastMCP
 
@@ -21,9 +23,15 @@ def register_auth_tools(mcp: FastMCP):
         """
         state = mcp.get_context().request_context.lifespan_context
 
-        state.mailbox = MailBox(server)
-        state.mailbox.login(username, password)
-        return "Login successful."
+        try:
+            state.mailbox = MailBox(server)
+            state.mailbox.login(username, password)
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
+            return f"Login failed: {e!s}"
+        except (OSError, ssl.SSLError) as e:
+            return f"Connection failed: {e!s}"
+        else:
+            return "Login successful."
 
     @mcp.tool()
     async def logout():
@@ -33,9 +41,15 @@ def register_auth_tools(mcp: FastMCP):
         if not state.mailbox:
             return "Not logged in. Please login first."
 
-        state.mailbox.logout()
-        state.mailbox = None
-        return "Logout successful."
+        try:
+            state.mailbox.logout()
+            state.mailbox = None
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
+            # Still set mailbox to None even if logout fails
+            state.mailbox = None
+            return f"Logout completed with warning: {e!s}"
+        else:
+            return "Logout successful."
 
     @mcp.tool()
     async def list_stored_accounts():
@@ -55,13 +69,19 @@ def register_auth_tools(mcp: FastMCP):
         Args:
             account_name: The name of the stored account to use for login
         """
-        credentials = credential_manager.get_account(account_name)
+        try:
+            credentials = credential_manager.get_account(account_name)
 
-        if not credentials:
-            return f"Account '{account_name}' not found. Use list_stored_accounts to see available accounts."
+            if not credentials:
+                return f"Account '{account_name}' not found. Use list_stored_accounts to see available accounts."
 
-        state = mcp.get_context().request_context.lifespan_context
+            state = mcp.get_context().request_context.lifespan_context
 
-        state.mailbox = MailBox(credentials.server)
-        state.mailbox.login(credentials.username, credentials.password)
-        return f"Login successful using stored account '{account_name}'."
+            state.mailbox = MailBox(credentials.server)
+            state.mailbox.login(credentials.username, credentials.password)
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
+            return f"Login failed for account '{account_name}': {e!s}"
+        except (OSError, ssl.SSLError) as e:
+            return f"Connection failed for account '{account_name}': {e!s}"
+        else:
+            return f"Login successful using stored account '{account_name}'."

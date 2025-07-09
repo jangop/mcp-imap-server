@@ -1,5 +1,6 @@
 """Folder management tools for IMAP server."""
 
+import imaplib
 from mcp.server.fastmcp import FastMCP
 from .state import get_state_or_error
 from datetime import datetime
@@ -87,7 +88,7 @@ def register_folder_tools(mcp: FastMCP):
                 "folders": folder_info,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to list folders: {e!s}"
 
     @mcp.tool()
@@ -145,7 +146,7 @@ def register_folder_tools(mcp: FastMCP):
                 and "\\Noselect" not in (folder_obj.flags or []),
                 "status": folder_status._asdict() if folder_status else {},
             }
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to get folder info for '{folder_name}': {e!s}"
         else:
             return info
@@ -167,7 +168,7 @@ def register_folder_tools(mcp: FastMCP):
                 return f"Folder '{folder_name}' already exists."
 
             state.mailbox.folder.create(folder_name)
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to create folder '{folder_name}': {e!s}"
         else:
             return f"Successfully created folder '{folder_name}'."
@@ -200,7 +201,7 @@ def register_folder_tools(mcp: FastMCP):
                     return f"Folder '{folder_name}' contains {message_count} messages. Use force=True to delete anyway."
 
             state.mailbox.folder.delete(folder_name)
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to delete folder '{folder_name}': {e!s}"
         else:
             return f"Successfully deleted folder '{folder_name}'."
@@ -226,7 +227,7 @@ def register_folder_tools(mcp: FastMCP):
                 return f"Folder '{new_name}' already exists."
 
             state.mailbox.folder.rename(old_name, new_name)
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to rename folder '{old_name}' to '{new_name}': {e!s}"
         else:
             return f"Successfully renamed folder '{old_name}' to '{new_name}'."
@@ -248,7 +249,7 @@ def register_folder_tools(mcp: FastMCP):
                 return f"Folder '{folder_name}' does not exist."
 
             state.mailbox.folder.subscribe(folder_name)
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to subscribe to folder '{folder_name}': {e!s}"
         else:
             return f"Successfully subscribed to folder '{folder_name}'."
@@ -270,7 +271,7 @@ def register_folder_tools(mcp: FastMCP):
                 return f"Folder '{folder_name}' does not exist."
 
             state.mailbox.folder.unsubscribe(folder_name)
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to unsubscribe from folder '{folder_name}': {e!s}"
         else:
             return f"Successfully unsubscribed from folder '{folder_name}'."
@@ -292,7 +293,7 @@ def register_folder_tools(mcp: FastMCP):
                 "folders": folder_names,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to list subscribed folders: {e!s}"
 
     # PAGINATION SUPPORT
@@ -396,7 +397,7 @@ def register_folder_tools(mcp: FastMCP):
                 },
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to list emails with pagination: {e!s}"
 
     # FOLDER STATISTICS & ANALYTICS
@@ -556,7 +557,7 @@ def register_folder_tools(mcp: FastMCP):
                 ],
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to get folder statistics for '{folder_name}': {e!s}"
 
     @mcp.tool()
@@ -630,7 +631,7 @@ def register_folder_tools(mcp: FastMCP):
 
                     state.mailbox.folder.set(current_folder)
 
-                except Exception as e:
+                except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
                     # If we can't access a folder, add it with error info but don't fail completely
                     folder_stats.append(
                         {
@@ -641,7 +642,7 @@ def register_folder_tools(mcp: FastMCP):
                     # Try to restore current folder if possible
                     try:
                         state.mailbox.folder.set(current_folder)
-                    except Exception:
+                    except (imaplib.IMAP4.error, imaplib.IMAP4.abort):
                         pass
 
             # Sort by message count (descending)
@@ -667,7 +668,7 @@ def register_folder_tools(mcp: FastMCP):
                 "folders": folder_stats,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to get all folders statistics: {e!s}"
 
     # HEADERS-ONLY OPERATIONS
@@ -699,7 +700,7 @@ def register_folder_tools(mcp: FastMCP):
                     "attachment_count": len(msg.attachments),
                     "message_id": msg.message_id,
                 }
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to get email headers for UID {uid}: {e!s}"
         else:
             return f"Email with UID {uid} not found."
@@ -753,5 +754,5 @@ def register_folder_tools(mcp: FastMCP):
                 "headers": results,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to get batch headers: {e!s}"

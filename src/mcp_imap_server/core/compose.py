@@ -1,5 +1,6 @@
 """Email composition tools for IMAP server."""
 
+import imaplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import email.utils
@@ -83,7 +84,7 @@ def register_compose_tools(mcp: FastMCP):
 
             # Append to the specified folder
             state.mailbox.append(message_bytes, folder, flag_set=flags)
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to create email: {e!s}"
         else:
             return f"Email successfully created and saved to '{folder}' folder."

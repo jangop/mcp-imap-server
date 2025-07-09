@@ -1,6 +1,7 @@
 """Email management tools for IMAP server."""
 
 import os
+import imaplib
 from datetime import datetime
 from pathlib import Path
 from imap_tools import AND, OR, MailMessageFlags
@@ -140,7 +141,7 @@ def register_email_tools(mcp: FastMCP):
 
         except ValueError as e:
             return f"Invalid date format. Use YYYY-MM-DD format. Error: {e!s}"
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to search emails by date: {e!s}"
 
     @mcp.tool()
@@ -203,7 +204,7 @@ def register_email_tools(mcp: FastMCP):
                 "emails": results,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to search emails by size: {e!s}"
 
     @mcp.tool()
@@ -279,7 +280,7 @@ def register_email_tools(mcp: FastMCP):
                 "emails": results,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to search emails by text: {e!s}"
 
     @mcp.tool()
@@ -328,7 +329,7 @@ def register_email_tools(mcp: FastMCP):
                 "emails": results,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to search emails with attachments: {e!s}"
 
     @mcp.tool()
@@ -417,7 +418,7 @@ def register_email_tools(mcp: FastMCP):
                 "emails": results,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to search emails by flags: {e!s}"
 
     @mcp.tool()
@@ -557,7 +558,7 @@ def register_email_tools(mcp: FastMCP):
                 "emails": results,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort, ValueError) as e:
             return f"Failed to perform advanced search: {e!s}"
 
     @mcp.tool()
@@ -601,7 +602,7 @@ def register_email_tools(mcp: FastMCP):
                 "emails": results,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to get recent emails: {e!s}"
 
     @mcp.tool()
@@ -712,7 +713,7 @@ def register_email_tools(mcp: FastMCP):
                 "files": extracted_files,
             }
 
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             return f"Failed to extract attachments from email {uid}: {e!s}"
 
     @mcp.tool()
@@ -767,7 +768,7 @@ def register_email_tools(mcp: FastMCP):
                 "attachments": attachments_info,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to list attachments for email {uid}: {e!s}"
 
     # BULK OPERATIONS
@@ -800,7 +801,7 @@ def register_email_tools(mcp: FastMCP):
                 "uids": uids,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to mark emails as read: {e!s}"
 
     @mcp.tool()
@@ -832,7 +833,7 @@ def register_email_tools(mcp: FastMCP):
                 "uids": uids,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to mark emails as unread: {e!s}"
 
     @mcp.tool()
@@ -864,7 +865,7 @@ def register_email_tools(mcp: FastMCP):
                 "uids": uids,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to delete emails: {e!s}"
 
     @mcp.tool()
@@ -904,7 +905,7 @@ def register_email_tools(mcp: FastMCP):
                 "uids": uids,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to move emails: {e!s}"
 
     @mcp.tool()
@@ -944,7 +945,7 @@ def register_email_tools(mcp: FastMCP):
                 "uids": uids,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to copy emails: {e!s}"
 
     @mcp.tool()
@@ -995,7 +996,7 @@ def register_email_tools(mcp: FastMCP):
                 "uids": uids,
             }
 
-        except Exception as e:
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to flag emails: {e!s}"
 
     @mcp.tool()
