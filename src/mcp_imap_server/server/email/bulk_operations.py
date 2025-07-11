@@ -27,9 +27,8 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             # Convert UIDs to comma-separated string
             uid_str = ",".join(str(uid) for uid in uids)
 
-            # Mark as read using IMAP command
-            # Use the MailBox object directly instead of accessing .mail
-            state.mailbox.store(uid_str, "+FLAGS", r"(\Seen)")
+            # Mark as read using the flag method
+            state.mailbox.flag(uid_str, r"\Seen", True)
 
             return {
                 "message": f"Successfully marked {len(uids)} emails as read",
@@ -60,9 +59,8 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             # Convert UIDs to comma-separated string
             uid_str = ",".join(str(uid) for uid in uids)
 
-            # Mark as unread using IMAP command
-            # Use the MailBox object directly instead of accessing .mail
-            state.mailbox.store(uid_str, "-FLAGS", r"(\Seen)")
+            # Mark as unread using the flag method
+            state.mailbox.flag(uid_str, r"\Seen", False)
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to mark emails as unread: {e!s}"
         else:
@@ -93,9 +91,8 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             # Convert UIDs to comma-separated string
             uid_str = ",".join(str(uid) for uid in uids)
 
-            # Mark as deleted using IMAP command
-            # Use the MailBox object directly instead of accessing .mail
-            state.mailbox.store(uid_str, "+FLAGS", r"(\Deleted)")
+            # Mark as deleted using the underlying client to avoid automatic expunging
+            state.mailbox.client.uid("STORE", uid_str, "+FLAGS", r"(\Deleted)")
 
             result = {
                 "message": f"Successfully marked {len(uids)} emails for deletion",
@@ -141,8 +138,8 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             # Use the MailBox object directly instead of accessing .mail
             state.mailbox.copy(uid_str, destination_folder)
 
-            # Mark original messages as deleted
-            state.mailbox.store(uid_str, "+FLAGS", r"(\Deleted)")
+            # Mark original messages as deleted using the underlying client
+            state.mailbox.client.uid("STORE", uid_str, "+FLAGS", r"(\Deleted)")
 
             # Expunge to complete the move
             state.mailbox.expunge()
@@ -225,16 +222,14 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
 
             # Add flags
             if add_flags:
-                flags_str = " ".join(add_flags)
-                # Use the MailBox object directly instead of accessing .mail
-                state.mailbox.store(uid_str, "+FLAGS", f"({flags_str})")
+                for flag in add_flags:
+                    state.mailbox.flag(uid_str, flag, True)
                 operations.append(f"added flags: {', '.join(add_flags)}")
 
             # Remove flags
             if remove_flags:
-                flags_str = " ".join(remove_flags)
-                # Use the MailBox object directly instead of accessing .mail
-                state.mailbox.store(uid_str, "-FLAGS", f"({flags_str})")
+                for flag in remove_flags:
+                    state.mailbox.flag(uid_str, flag, False)
                 operations.append(f"removed flags: {', '.join(remove_flags)}")
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to modify email flags: {e!s}"

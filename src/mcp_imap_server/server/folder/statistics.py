@@ -63,16 +63,28 @@ def register_folder_statistics_tools(mcp: FastMCP):
                 }
             else:
                 # Get overall statistics across all folders
-                folders = state.mailbox.folder.list()
-                total_folders = len(folders)
+                folder_names = []
+                try:
+                    folder_manager = state.mailbox.folder
+                    folder_names = [folder.name for folder in folder_manager.list()]
+                except (
+                    imaplib.IMAP4.error,
+                    imaplib.IMAP4.abort,
+                    AttributeError,
+                    TypeError,
+                ):
+                    # Fallback: try to get just the current folder
+                    folder_names = [str(state.mailbox.folder)]
+
+                total_folders = len(folder_names)
                 total_messages = 0
                 total_read = 0
                 total_unread = 0
                 total_flagged = 0
 
-                for folder in folders:
+                for folder_name in folder_names:
                     try:
-                        state.mailbox.folder.set(folder)
+                        state.mailbox.folder.set(folder_name)
                         messages = list(state.mailbox.fetch())
                         total_messages += len(messages)
 
@@ -84,7 +96,12 @@ def register_folder_statistics_tools(mcp: FastMCP):
 
                             if "\\Flagged" in msg.flags:
                                 total_flagged += 1
-                    except Exception:
+                    except (
+                        imaplib.IMAP4.error,
+                        imaplib.IMAP4.abort,
+                        AttributeError,
+                        TypeError,
+                    ):
                         continue  # Skip folders that can't be accessed
 
                 result = {
@@ -121,10 +138,10 @@ def register_folder_statistics_tools(mcp: FastMCP):
         try:
             # Use current folder if none specified
             original_folder = state.mailbox.folder
-            if folder_name and folder_name != original_folder:
+            if folder_name and folder_name != str(original_folder):
                 state.mailbox.folder.set(folder_name)
             else:
-                folder_name = original_folder
+                folder_name = str(original_folder)
 
             # Get all messages
             all_messages = list(state.mailbox.fetch(headers_only=True))
@@ -208,10 +225,10 @@ def register_folder_statistics_tools(mcp: FastMCP):
         try:
             # Use current folder if none specified
             original_folder = state.mailbox.folder
-            if folder_name and folder_name != original_folder:
+            if folder_name and folder_name != str(original_folder):
                 state.mailbox.folder.set(folder_name)
             else:
-                folder_name = original_folder
+                folder_name = str(original_folder)
 
             # Calculate date range
             end_date = datetime.now().date()
@@ -294,10 +311,10 @@ def register_folder_statistics_tools(mcp: FastMCP):
         try:
             # Use current folder if none specified
             original_folder = state.mailbox.folder
-            if folder_name and folder_name != original_folder:
+            if folder_name and folder_name != str(original_folder):
                 state.mailbox.folder.set(folder_name)
             else:
-                folder_name = original_folder
+                folder_name = str(original_folder)
 
             # Get all messages
             all_messages = list(state.mailbox.fetch(headers_only=True))

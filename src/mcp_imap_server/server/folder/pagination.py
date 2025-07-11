@@ -38,10 +38,10 @@ def register_folder_pagination_tools(mcp: FastMCP):
         try:
             # Use current folder if none specified
             original_folder = state.mailbox.folder
-            if folder_name and folder_name != original_folder:
+            if folder_name and folder_name != str(original_folder):
                 state.mailbox.folder.set(folder_name)
             else:
-                folder_name = original_folder
+                folder_name = str(original_folder)
 
             # Get total count first - use uids() to get all UIDs
             all_uids = state.mailbox.uids()
@@ -148,10 +148,10 @@ def register_folder_pagination_tools(mcp: FastMCP):
         try:
             # Use current folder if none specified
             original_folder = state.mailbox.folder
-            if folder_name and folder_name != original_folder:
+            if folder_name and folder_name != str(original_folder):
                 state.mailbox.folder.set(folder_name)
             else:
-                folder_name = original_folder
+                folder_name = str(original_folder)
 
             # Create search criteria - search in both subject and from fields
             from imap_tools import OR
@@ -276,10 +276,10 @@ def register_folder_pagination_tools(mcp: FastMCP):
         try:
             # Use current folder if none specified
             original_folder = state.mailbox.folder
-            if folder_name and folder_name != original_folder:
+            if folder_name and folder_name != str(original_folder):
                 state.mailbox.folder.set(folder_name)
             else:
-                folder_name = original_folder
+                folder_name = str(original_folder)
 
             # Create search criteria
             criteria = AND(**flag_mapping[flag_upper])

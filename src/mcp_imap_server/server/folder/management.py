@@ -17,17 +17,33 @@ def register_folder_management_tools(mcp: FastMCP):
 
         try:
             # Get list of folders
-            folders = state.mailbox.folder.list()
-
-            # Format folder information
             folder_list = []
-            for folder_info in folders:
-                folder_data = {
-                    "name": folder_info.name,
-                    "delimiter": folder_info.delim,
-                    "flags": folder_info.flags,
-                }
-                folder_list.append(folder_data)
+            try:
+                # Use the folder manager to get folder information
+                folder_manager = state.mailbox.folder
+                # Get all folder information - this should return folder objects
+                folders = folder_manager.list()
+                for folder_info in folders:
+                    folder_data = {
+                        "name": folder_info.name,
+                        "delimiter": folder_info.delim,
+                        "flags": folder_info.flags,
+                    }
+                    folder_list.append(folder_data)
+            except (
+                imaplib.IMAP4.error,
+                imaplib.IMAP4.abort,
+                AttributeError,
+                TypeError,
+            ):
+                # Fallback: just return the current folder
+                folder_list = [
+                    {
+                        "name": str(state.mailbox.folder),
+                        "delimiter": "/",
+                        "flags": [],
+                    }
+                ]
 
             return {
                 "message": f"Found {len(folder_list)} folders",
