@@ -66,12 +66,22 @@ def register_folder_pagination_tools(mcp: FastMCP):
             # Get UIDs for this page
             page_uids = all_uids[start_idx:end_idx]
 
+            # Handle case where no UIDs are available for this page
+            if not page_uids:
+                return {
+                    "message": f"Page {page} is beyond available data",
+                    "folder": folder_name,
+                    "page": page,
+                    "page_size": page_size,
+                    "total_emails": total_emails,
+                    "total_pages": total_pages,
+                    "emails": [],
+                }
+
             # Fetch messages for this page using UID criteria
             # Convert UIDs to string format for search criteria
             uid_criteria = " OR ".join([f"UID {uid}" for uid in page_uids])
-            page_messages = list(
-                mailbox.fetch(uid_criteria, headers_only=headers_only)
-            )
+            page_messages = list(mailbox.fetch(uid_criteria, headers_only=headers_only))
 
             # Format results
             results = []
