@@ -1,9 +1,9 @@
 """Folder pagination tools for IMAP server."""
 
 import imaplib
-from imap_tools import AND
+from imap_tools.query import OR
 from mcp.server.fastmcp import FastMCP
-from ..state import get_state_or_error
+from ..state import get_mailbox
 
 
 def register_folder_pagination_tools(mcp: FastMCP):
@@ -25,9 +25,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
             folder_name: Name of the folder (empty for current folder)
             headers_only: If True, only fetch headers for faster loading
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         if page < 1:
             return "Page number must be 1 or greater."
@@ -37,14 +35,14 @@ def register_folder_pagination_tools(mcp: FastMCP):
 
         try:
             # Use current folder if none specified
-            original_folder = state.mailbox.folder
+            original_folder = mailbox.folder.get() or "INBOX"
             if folder_name and folder_name != str(original_folder):
-                state.mailbox.folder.set(folder_name)
+                mailbox.folder.set(folder_name)
             else:
                 folder_name = str(original_folder)
 
             # Get total count first - use uids() to get all UIDs
-            all_uids = state.mailbox.uids()
+            all_uids = mailbox.uids()
             total_emails = len(all_uids)
 
             # Calculate pagination
@@ -72,7 +70,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
             # Convert UIDs to string format for search criteria
             uid_criteria = " OR ".join([f"UID {uid}" for uid in page_uids])
             page_messages = list(
-                state.mailbox.fetch(uid_criteria, headers_only=headers_only)
+                mailbox.fetch(uid_criteria, headers_only=headers_only)
             )
 
             # Format results
@@ -98,7 +96,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
 
             # Restore original folder if we changed it
             if folder_name != original_folder:
-                state.mailbox.folder.set(original_folder)
+                mailbox.folder.set(original_folder)
 
             return {
                 "message": f"Page {page} of {total_pages} from folder '{folder_name}'",
@@ -135,9 +133,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
             folder_name: Name of the folder (empty for current folder)
             headers_only: If True, only fetch headers for faster loading
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         if page < 1:
             return "Page number must be 1 or greater."
@@ -147,19 +143,17 @@ def register_folder_pagination_tools(mcp: FastMCP):
 
         try:
             # Use current folder if none specified
-            original_folder = state.mailbox.folder
+            original_folder = mailbox.folder.get() or "INBOX"
             if folder_name and folder_name != str(original_folder):
-                state.mailbox.folder.set(folder_name)
+                mailbox.folder.set(folder_name)
             else:
                 folder_name = str(original_folder)
 
             # Create search criteria - search in both subject and from fields
-            from imap_tools import OR
-
             criteria = OR(subject=search_criteria, from_=search_criteria)
 
             # Get all matching UIDs
-            matching_messages = list(state.mailbox.fetch(criteria, headers_only=True))
+            matching_messages = list(mailbox.fetch(criteria, headers_only=True))
             total_matches = len(matching_messages)
 
             # Calculate pagination
@@ -207,7 +201,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
 
             # Restore original folder if we changed it
             if folder_name != original_folder:
-                state.mailbox.folder.set(original_folder)
+                mailbox.folder.set(original_folder)
 
             return {
                 "message": f"Search results page {page} of {total_pages} for '{search_criteria}'",
@@ -245,9 +239,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
             folder_name: Name of the folder (empty for current folder)
             headers_only: If True, only fetch headers for faster loading
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         if page < 1:
             return "Page number must be 1 or greater."
@@ -257,16 +249,16 @@ def register_folder_pagination_tools(mcp: FastMCP):
 
         # Map flag names to search criteria
         flag_mapping = {
-            "SEEN": {"seen": True},
-            "UNSEEN": {"seen": False},
-            "FLAGGED": {"flagged": True},
-            "UNFLAGGED": {"flagged": False},
-            "DELETED": {"deleted": True},
-            "UNDELETED": {"deleted": False},
-            "ANSWERED": {"answered": True},
-            "UNANSWERED": {"answered": False},
-            "DRAFT": {"draft": True},
-            "UNDRAFT": {"draft": False},
+            "SEEN": "SEEN",
+            "UNSEEN": "UNSEEN",
+            "FLAGGED": "FLAGGED",
+            "UNFLAGGED": "UNFLAGGED",
+            "DELETED": "DELETED",
+            "UNDELETED": "UNDELETED",
+            "ANSWERED": "ANSWERED",
+            "UNANSWERED": "UNANSWERED",
+            "DRAFT": "DRAFT",
+            "UNDRAFT": "UNDRAFT",
         }
 
         flag_upper = flag.upper()
@@ -275,17 +267,17 @@ def register_folder_pagination_tools(mcp: FastMCP):
 
         try:
             # Use current folder if none specified
-            original_folder = state.mailbox.folder
+            original_folder = mailbox.folder.get() or "INBOX"
             if folder_name and folder_name != str(original_folder):
-                state.mailbox.folder.set(folder_name)
+                mailbox.folder.set(folder_name)
             else:
                 folder_name = str(original_folder)
 
-            # Create search criteria
-            criteria = AND(**flag_mapping[flag_upper])
+            # Create search criteria using the flag string directly
+            criteria = flag_mapping[flag_upper]
 
             # Get all matching messages
-            matching_messages = list(state.mailbox.fetch(criteria, headers_only=True))
+            matching_messages = list(mailbox.fetch(criteria, headers_only=True))
             total_matches = len(matching_messages)
 
             # Calculate pagination
@@ -333,7 +325,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
 
             # Restore original folder if we changed it
             if folder_name != original_folder:
-                state.mailbox.folder.set(original_folder)
+                mailbox.folder.set(original_folder)
 
             return {
                 "message": f"Page {page} of {total_pages} for emails with flag '{flag}'",

@@ -161,7 +161,7 @@ class CredentialManager:
 
         return AccountCredentials(
             username=account_data["username"],
-            password=password,
+            password=password or "",  # Ensure password is not None
             server=account_data["server"],
         )
 

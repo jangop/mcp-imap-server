@@ -2,7 +2,7 @@
 
 import imaplib
 from mcp.server.fastmcp import FastMCP
-from ..state import get_state_or_error
+from ..state import get_mailbox
 
 
 def register_email_bulk_operations_tools(mcp: FastMCP):
@@ -16,9 +16,7 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
         Args:
             uids: List of email UIDs to mark as read
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         if not uids:
             return "No UIDs provided."
@@ -28,7 +26,7 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             uid_str = ",".join(str(uid) for uid in uids)
 
             # Mark as read using the flag method
-            state.mailbox.flag(uid_str, r"\Seen", True)
+            mailbox.flag(uid_str, r"\Seen", True)
 
             return {
                 "message": f"Successfully marked {len(uids)} emails as read",
@@ -48,9 +46,7 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
         Args:
             uids: List of email UIDs to mark as unread
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         if not uids:
             return "No UIDs provided."
@@ -60,10 +56,8 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             uid_str = ",".join(str(uid) for uid in uids)
 
             # Mark as unread using the flag method
-            state.mailbox.flag(uid_str, r"\Seen", False)
-        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
-            return f"Failed to mark emails as unread: {e!s}"
-        else:
+            mailbox.flag(uid_str, r"\Seen", False)
+
             return {
                 "message": f"Successfully marked {len(uids)} emails as unread",
                 "uids": uids,
@@ -71,18 +65,18 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
                 "success_count": len(uids),
             }
 
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
+            return f"Failed to mark emails as unread: {e!s}"
+
     @mcp.tool()
-    async def bulk_delete_emails(uids: list[int], expunge: bool = False):
+    async def bulk_delete_emails(uids: list[int]):
         """
         Delete multiple emails using their UIDs.
 
         Args:
             uids: List of email UIDs to delete
-            expunge: If True, permanently remove emails; if False, just mark as deleted
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         if not uids:
             return "No UIDs provided."
@@ -91,68 +85,19 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             # Convert UIDs to comma-separated string
             uid_str = ",".join(str(uid) for uid in uids)
 
-            # Mark as deleted using the underlying client to avoid automatic expunging
-            state.mailbox.client.uid("STORE", uid_str, "+FLAGS", r"(\Deleted)")
+            # Mark as deleted using the underlying IMAP client
+            mailbox.client.uid("STORE", uid_str, "+FLAGS", r"(\Deleted)")
+            mailbox.expunge()
 
-            result = {
-                "message": f"Successfully marked {len(uids)} emails for deletion",
+            return {
+                "message": f"Successfully deleted {len(uids)} emails",
                 "uids": uids,
                 "operation": "delete",
                 "success_count": len(uids),
-                "expunged": False,
             }
 
-            # Expunge if requested
-            if expunge:
-                state.mailbox.expunge()
-                result["message"] = (
-                    f"Successfully deleted {len(uids)} emails permanently"
-                )
-                result["expunged"] = True
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to delete emails: {e!s}"
-        else:
-            return result
-
-    @mcp.tool()
-    async def bulk_move_emails(uids: list[int], destination_folder: str):
-        """
-        Move multiple emails to another folder using their UIDs.
-
-        Args:
-            uids: List of email UIDs to move
-            destination_folder: Name of the destination folder
-        """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
-
-        if not uids:
-            return "No UIDs provided."
-
-        try:
-            # Convert UIDs to comma-separated string
-            uid_str = ",".join(str(uid) for uid in uids)
-
-            # Copy to destination folder
-            # Use the MailBox object directly instead of accessing .mail
-            state.mailbox.copy(uid_str, destination_folder)
-
-            # Mark original messages as deleted using the underlying client
-            state.mailbox.client.uid("STORE", uid_str, "+FLAGS", r"(\Deleted)")
-
-            # Expunge to complete the move
-            state.mailbox.expunge()
-        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
-            return f"Failed to move emails: {e!s}"
-        else:
-            return {
-                "message": f"Successfully moved {len(uids)} emails to '{destination_folder}'",
-                "uids": uids,
-                "operation": "move",
-                "destination_folder": destination_folder,
-                "success_count": len(uids),
-            }
 
     @mcp.tool()
     async def bulk_copy_emails(uids: list[int], destination_folder: str):
@@ -161,11 +106,9 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
 
         Args:
             uids: List of email UIDs to copy
-            destination_folder: Name of the destination folder
+            destination_folder: Destination folder name
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         if not uids:
             return "No UIDs provided."
@@ -174,72 +117,83 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             # Convert UIDs to comma-separated string
             uid_str = ",".join(str(uid) for uid in uids)
 
-            # Copy to destination folder
-            state.mailbox.copy(uid_str, destination_folder)
-        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
-            return f"Failed to copy emails: {e!s}"
-        else:
+            # Copy emails to destination folder
+            mailbox.copy(uid_str, destination_folder)
+
             return {
                 "message": f"Successfully copied {len(uids)} emails to '{destination_folder}'",
                 "uids": uids,
-                "operation": "copy",
                 "destination_folder": destination_folder,
+                "operation": "copy",
                 "success_count": len(uids),
             }
 
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
+            return f"Failed to copy emails: {e!s}"
+
     @mcp.tool()
-    async def bulk_flag_emails(
-        uids: list[int],
-        add_flags: list[str] | None = None,
-        remove_flags: list[str] | None = None,
-    ):
+    async def bulk_move_emails(uids: list[int], destination_folder: str):
         """
-        Add or remove flags from multiple emails using their UIDs.
+        Move multiple emails to another folder using their UIDs.
 
         Args:
-            uids: List of email UIDs to modify
-            add_flags: List of flags to add (e.g., ['\\Flagged', '\\Important'])
-            remove_flags: List of flags to remove (e.g., ['\\Seen', '\\Flagged'])
+            uids: List of email UIDs to move
+            destination_folder: Destination folder name
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         if not uids:
             return "No UIDs provided."
-
-        if not add_flags and not remove_flags:
-            return "Please specify flags to add or remove."
-
-        add_flags = add_flags or []
-        remove_flags = remove_flags or []
 
         try:
             # Convert UIDs to comma-separated string
             uid_str = ",".join(str(uid) for uid in uids)
 
-            operations = []
+            # Move emails to destination folder
+            mailbox.move(uid_str, destination_folder)
 
-            # Add flags
-            if add_flags:
-                for flag in add_flags:
-                    state.mailbox.flag(uid_str, flag, True)
-                operations.append(f"added flags: {', '.join(add_flags)}")
-
-            # Remove flags
-            if remove_flags:
-                for flag in remove_flags:
-                    state.mailbox.flag(uid_str, flag, False)
-                operations.append(f"removed flags: {', '.join(remove_flags)}")
-        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
-            return f"Failed to modify email flags: {e!s}"
-        else:
             return {
-                "message": f"Successfully modified flags for {len(uids)} emails",
+                "message": f"Successfully moved {len(uids)} emails to '{destination_folder}'",
                 "uids": uids,
-                "operation": "flag_modification",
-                "operations": operations,
+                "destination_folder": destination_folder,
+                "operation": "move",
                 "success_count": len(uids),
-                "added_flags": add_flags,
-                "removed_flags": remove_flags,
             }
+
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
+            return f"Failed to move emails: {e!s}"
+
+    @mcp.tool()
+    async def bulk_flag_emails(uids: list[int], flag: str, value: bool = True):
+        """
+        Set or unset flags for multiple emails using their UIDs.
+
+        Args:
+            uids: List of email UIDs to flag
+            flag: Flag to set/unset (e.g., "\\Seen", "\\Flagged", "\\Deleted")
+            value: True to set flag, False to unset flag
+        """
+        mailbox = get_mailbox(mcp.get_context())
+
+        if not uids:
+            return "No UIDs provided."
+
+        try:
+            # Convert UIDs to comma-separated string
+            uid_str = ",".join(str(uid) for uid in uids)
+
+            # Set or unset flag
+            mailbox.flag(uid_str, flag, value)
+
+            action = "set" if value else "unset"
+            return {
+                "message": f"Successfully {action} flag '{flag}' for {len(uids)} emails",
+                "uids": uids,
+                "flag": flag,
+                "value": value,
+                "operation": f"flag_{action}",
+                "success_count": len(uids),
+            }
+
+        except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
+            return f"Failed to flag emails: {e!s}"

@@ -1,10 +1,8 @@
 """Folder statistics tools for IMAP server."""
 
 import imaplib
-from datetime import datetime, timedelta
-from imap_tools import AND
 from mcp.server.fastmcp import FastMCP
-from ..state import get_state_or_error
+from ..state import get_mailbox
 
 
 def register_folder_statistics_tools(mcp: FastMCP):
@@ -18,19 +16,17 @@ def register_folder_statistics_tools(mcp: FastMCP):
         Args:
             folder_name: Name of the folder (empty for current folder)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Get folder statistics
             if folder_name:
                 # Switch to specific folder for statistics
-                original_folder = state.mailbox.folder
-                state.mailbox.folder.set(folder_name)
+                original_folder = mailbox.folder.get() or "INBOX"
+                mailbox.folder.set(folder_name)
 
                 # Get statistics for the specific folder - convert generator to list
-                messages = list(state.mailbox.fetch())
+                messages = list(mailbox.fetch())
                 total_messages = len(messages)
 
                 # Count read/unread messages
@@ -48,103 +44,67 @@ def register_folder_statistics_tools(mcp: FastMCP):
                         flagged_count += 1
 
                 # Restore original folder
-                state.mailbox.folder.set(original_folder)
-
-                result = {
-                    "message": f"Statistics for folder '{folder_name}'",
-                    "folder": folder_name,
-                    "total_messages": total_messages,
-                    "read_messages": read_count,
-                    "unread_messages": unread_count,
-                    "flagged_messages": flagged_count,
-                    "read_percentage": f"{(read_count / total_messages) * 100:.1f}%"
-                    if total_messages > 0
-                    else "0%",
-                }
+                mailbox.folder.set(str(original_folder))
             else:
-                # Get overall statistics across all folders
-                folder_names = []
-                try:
-                    folder_manager = state.mailbox.folder
-                    folder_names = [folder.name for folder in folder_manager.list()]
-                except (
-                    imaplib.IMAP4.error,
-                    imaplib.IMAP4.abort,
-                    AttributeError,
-                    TypeError,
-                ):
-                    # Fallback: try to get just the current folder
-                    folder_names = [str(state.mailbox.folder)]
+                # Use current folder
+                folder_name = mailbox.folder.get() or "INBOX"
+                messages = list(mailbox.fetch())
+                total_messages = len(messages)
 
-                total_folders = len(folder_names)
-                total_messages = 0
-                total_read = 0
-                total_unread = 0
-                total_flagged = 0
+                # Count read/unread messages
+                read_count = 0
+                unread_count = 0
+                flagged_count = 0
 
-                for folder_name in folder_names:
-                    try:
-                        state.mailbox.folder.set(folder_name)
-                        messages = list(state.mailbox.fetch())
-                        total_messages += len(messages)
+                for msg in messages:
+                    if "\\Seen" in msg.flags:
+                        read_count += 1
+                    else:
+                        unread_count += 1
 
-                        for msg in messages:
-                            if "\\Seen" in msg.flags:
-                                total_read += 1
-                            else:
-                                total_unread += 1
+                    if "\\Flagged" in msg.flags:
+                        flagged_count += 1
 
-                            if "\\Flagged" in msg.flags:
-                                total_flagged += 1
-                    except (
-                        imaplib.IMAP4.error,
-                        imaplib.IMAP4.abort,
-                        AttributeError,
-                        TypeError,
-                    ):
-                        continue  # Skip folders that can't be accessed
+            # Calculate percentages
+            read_percentage = (read_count / total_messages * 100) if total_messages > 0 else 0
+            unread_percentage = (unread_count / total_messages * 100) if total_messages > 0 else 0
+            flagged_percentage = (flagged_count / total_messages * 100) if total_messages > 0 else 0
 
-                result = {
-                    "message": "Overall email statistics",
-                    "total_folders": total_folders,
-                    "total_messages": total_messages,
-                    "read_messages": total_read,
-                    "unread_messages": total_unread,
-                    "flagged_messages": total_flagged,
-                    "read_percentage": f"{(total_read / total_messages) * 100:.1f}%"
-                    if total_messages > 0
-                    else "0%",
-                }
+            return {
+                "message": f"Statistics for folder '{folder_name}'",
+                "folder": folder_name,
+                "total_messages": total_messages,
+                "read_messages": read_count,
+                "unread_messages": unread_count,
+                "flagged_messages": flagged_count,
+                "read_percentage": round(read_percentage, 2),
+                "unread_percentage": round(unread_percentage, 2),
+                "flagged_percentage": round(flagged_percentage, 2),
+            }
+
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to get folder statistics: {e!s}"
-        else:
-            return result
 
     @mcp.tool()
-    async def get_folder_size_breakdown(
-        folder_name: str = "", size_ranges: bool = True
-    ):
+    async def get_folder_size_distribution(folder_name: str = ""):
         """
-        Get size breakdown analysis for a folder.
+        Get email size distribution for a folder.
 
         Args:
             folder_name: Name of the folder (empty for current folder)
-            size_ranges: Include size range breakdown
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Use current folder if none specified
-            original_folder = state.mailbox.folder
+            original_folder = mailbox.folder.get() or "INBOX"
             if folder_name and folder_name != str(original_folder):
-                state.mailbox.folder.set(folder_name)
+                mailbox.folder.set(folder_name)
             else:
                 folder_name = str(original_folder)
 
             # Get all messages
-            all_messages = list(state.mailbox.fetch(headers_only=True))
+            all_messages = list(mailbox.fetch(headers_only=True))
 
             if not all_messages:
                 return {
@@ -156,144 +116,127 @@ def register_folder_statistics_tools(mcp: FastMCP):
             # Calculate size statistics
             sizes = [msg.size for msg in all_messages]
             total_size = sum(sizes)
-            avg_size = total_size // len(sizes)
-            max_size = max(sizes)
-            min_size = min(sizes)
+            avg_size = total_size / len(sizes) if sizes else 0
+            max_size = max(sizes) if sizes else 0
+            min_size = min(sizes) if sizes else 0
 
-            result = {
-                "message": f"Size breakdown for folder '{folder_name}'",
+            # Create size distribution
+            size_ranges = {
+                "0-1KB": 0,
+                "1KB-10KB": 0,
+                "10KB-100KB": 0,
+                "100KB-1MB": 0,
+                "1MB-10MB": 0,
+                "10MB+": 0,
+            }
+
+            for size in sizes:
+                if size < 1024:
+                    size_ranges["0-1KB"] += 1
+                elif size < 10 * 1024:
+                    size_ranges["1KB-10KB"] += 1
+                elif size < 100 * 1024:
+                    size_ranges["10KB-100KB"] += 1
+                elif size < 1024 * 1024:
+                    size_ranges["100KB-1MB"] += 1
+                elif size < 10 * 1024 * 1024:
+                    size_ranges["1MB-10MB"] += 1
+                else:
+                    size_ranges["10MB+"] += 1
+
+            # Restore original folder if we changed it
+            if folder_name != original_folder and mailbox:
+                mailbox.folder.set(original_folder)
+
+            return {
+                "message": f"Size distribution for folder '{folder_name}'",
                 "folder": folder_name,
                 "total_messages": len(all_messages),
                 "total_size_bytes": total_size,
-                "total_size_formatted": _format_size(total_size),
-                "average_size_bytes": avg_size,
-                "average_size_formatted": _format_size(avg_size),
-                "largest_email_bytes": max_size,
-                "largest_email_formatted": _format_size(max_size),
-                "smallest_email_bytes": min_size,
-                "smallest_email_formatted": _format_size(min_size),
+                "total_size_mb": round(total_size / (1024 * 1024), 2),
+                "average_size_bytes": round(avg_size, 2),
+                "average_size_kb": round(avg_size / 1024, 2),
+                "max_size_bytes": max_size,
+                "max_size_mb": round(max_size / (1024 * 1024), 2),
+                "min_size_bytes": min_size,
+                "size_distribution": size_ranges,
             }
 
-            # Add size ranges if requested
-            if size_ranges:
-                ranges = {
-                    "tiny (< 1KB)": 0,
-                    "small (1KB - 10KB)": 0,
-                    "medium (10KB - 100KB)": 0,
-                    "large (100KB - 1MB)": 0,
-                    "very_large (1MB - 10MB)": 0,
-                    "huge (> 10MB)": 0,
-                }
-
-                for size in sizes:
-                    if size < 1024:
-                        ranges["tiny (< 1KB)"] += 1
-                    elif size < 10240:
-                        ranges["small (1KB - 10KB)"] += 1
-                    elif size < 102400:
-                        ranges["medium (10KB - 100KB)"] += 1
-                    elif size < 1048576:
-                        ranges["large (100KB - 1MB)"] += 1
-                    elif size < 10485760:
-                        ranges["very_large (1MB - 10MB)"] += 1
-                    else:
-                        ranges["huge (> 10MB)"] += 1
-
-                result["size_ranges"] = ranges
-
-            # Restore original folder if we changed it
-            if folder_name != original_folder:
-                state.mailbox.folder.set(original_folder)
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
-            return f"Failed to get folder size breakdown: {e!s}"
-        else:
-            return result
+            return f"Failed to get folder size distribution: {e!s}"
 
     @mcp.tool()
-    async def get_folder_activity_stats(folder_name: str = "", days: int = 30):
+    async def get_folder_date_distribution(folder_name: str = ""):
         """
-        Get activity statistics for a folder over the specified time period.
+        Get email date distribution for a folder.
 
         Args:
             folder_name: Name of the folder (empty for current folder)
-            days: Number of days to analyze (default: 30)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Use current folder if none specified
-            original_folder = state.mailbox.folder
+            original_folder = mailbox.folder.get() or "INBOX"
             if folder_name and folder_name != str(original_folder):
-                state.mailbox.folder.set(folder_name)
+                mailbox.folder.set(folder_name)
             else:
                 folder_name = str(original_folder)
 
-            # Calculate date range
-            end_date = datetime.now().date()
-            start_date = end_date - timedelta(days=days)
+            # Get all messages
+            all_messages = list(mailbox.fetch(headers_only=True))
 
-            # Search for messages in the date range
-            criteria = AND(date_gte=start_date)
-            recent_messages = list(state.mailbox.fetch(criteria, headers_only=True))
+            if not all_messages:
+                return {
+                    "message": f"No messages in folder '{folder_name}'",
+                    "folder": folder_name,
+                    "total_messages": 0,
+                }
 
-            # Count by day
-            daily_counts = {}
-            for i in range(days + 1):
-                date = start_date + timedelta(days=i)
-                daily_counts[date.strftime("%Y-%m-%d")] = 0
-
-            # Count messages per day
-            for msg in recent_messages:
+            # Calculate date statistics
+            dates = []
+            for msg in all_messages:
                 if msg.date:
-                    date_str = msg.date.strftime("%Y-%m-%d")
-                    if date_str in daily_counts:
-                        daily_counts[date_str] += 1
+                    dates.append(msg.date)
 
-            # Calculate weekly averages
-            weekly_totals = []
-            for week_start in range(0, days, 7):
-                week_end = min(week_start + 7, days)
-                week_total = sum(
-                    daily_counts.get(
-                        (start_date + timedelta(days=d)).strftime("%Y-%m-%d"), 0
-                    )
-                    for d in range(week_start, week_end)
-                )
-                weekly_totals.append(week_total)
+            if not dates:
+                return {
+                    "message": f"No messages with valid dates in folder '{folder_name}'",
+                    "folder": folder_name,
+                    "total_messages": len(all_messages),
+                }
 
-            # Get busiest and quietest days
-            sorted_days = sorted(daily_counts.items(), key=lambda x: x[1], reverse=True)
-            busiest_day = sorted_days[0] if sorted_days else None
-            quietest_day = sorted_days[-1] if sorted_days else None
+            # Sort dates
+            dates.sort()
+
+            # Calculate date ranges
+            oldest_date = dates[0]
+            newest_date = dates[-1]
+            date_range = newest_date - oldest_date
+
+            # Create monthly distribution
+            monthly_distribution = {}
+            for date in dates:
+                month_key = f"{date.year}-{date.month:02d}"
+                monthly_distribution[month_key] = monthly_distribution.get(month_key, 0) + 1
 
             # Restore original folder if we changed it
-            if folder_name != original_folder:
-                state.mailbox.folder.set(original_folder)
+            if folder_name != original_folder and mailbox:
+                mailbox.folder.set(original_folder)
 
             return {
-                "message": f"Activity statistics for folder '{folder_name}' over {days} days",
+                "message": f"Date distribution for folder '{folder_name}'",
                 "folder": folder_name,
-                "period_days": days,
-                "start_date": start_date.strftime("%Y-%m-%d"),
-                "end_date": end_date.strftime("%Y-%m-%d"),
-                "total_messages_in_period": len(recent_messages),
-                "daily_average": len(recent_messages) / days if days > 0 else 0,
-                "weekly_averages": weekly_totals,
-                "busiest_day": {
-                    "date": busiest_day[0] if busiest_day else None,
-                    "count": busiest_day[1] if busiest_day else 0,
-                },
-                "quietest_day": {
-                    "date": quietest_day[0] if quietest_day else None,
-                    "count": quietest_day[1] if quietest_day else 0,
-                },
-                "daily_counts": daily_counts,
+                "total_messages": len(all_messages),
+                "messages_with_dates": len(dates),
+                "oldest_date": oldest_date.isoformat(),
+                "newest_date": newest_date.isoformat(),
+                "date_range_days": date_range.days,
+                "monthly_distribution": monthly_distribution,
             }
 
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
-            return f"Failed to get folder activity statistics: {e!s}"
+            return f"Failed to get folder date distribution: {e!s}"
 
     @mcp.tool()
     async def get_top_senders(folder_name: str = "", limit: int = 10):
@@ -304,20 +247,18 @@ def register_folder_statistics_tools(mcp: FastMCP):
             folder_name: Name of the folder (empty for current folder)
             limit: Number of top senders to return (default: 10)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Use current folder if none specified
-            original_folder = state.mailbox.folder
+            original_folder = mailbox.folder.get() or "INBOX"
             if folder_name and folder_name != str(original_folder):
-                state.mailbox.folder.set(folder_name)
+                mailbox.folder.set(folder_name)
             else:
                 folder_name = str(original_folder)
 
             # Get all messages
-            all_messages = list(state.mailbox.fetch(headers_only=True))
+            all_messages = list(mailbox.fetch(headers_only=True))
 
             if not all_messages:
                 return {
@@ -327,7 +268,7 @@ def register_folder_statistics_tools(mcp: FastMCP):
                 }
 
             # Count emails by sender
-            sender_counts = {}
+            sender_counts: dict[str, int] = {}
             for msg in all_messages:
                 sender = msg.from_ or "Unknown"
                 sender_counts[sender] = sender_counts.get(sender, 0) + 1
@@ -350,32 +291,15 @@ def register_folder_statistics_tools(mcp: FastMCP):
             ]
 
             # Restore original folder if we changed it
-            if folder_name != original_folder:
-                state.mailbox.folder.set(original_folder)
+            if folder_name != original_folder and mailbox:
+                mailbox.folder.set(original_folder)
 
             return {
-                "message": f"Top {len(top_senders)} senders in folder '{folder_name}'",
+                "message": f"Top {len(top_senders_with_percentage)} senders in folder '{folder_name}'",
                 "folder": folder_name,
                 "total_messages": total_messages,
-                "unique_senders": len(sender_counts),
                 "top_senders": top_senders_with_percentage,
             }
 
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to get top senders: {e!s}"
-
-
-def _format_size(size_bytes: int) -> str:
-    """Format file size in human-readable format."""
-    if size_bytes == 0:
-        return "0 B"
-
-    size_names = ["B", "KB", "MB", "GB"]
-    size = float(size_bytes)
-    i = 0
-
-    while size >= 1024 and i < len(size_names) - 1:
-        size /= 1024
-        i += 1
-
-    return f"{size:.1f} {size_names[i]}"

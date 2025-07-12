@@ -2,9 +2,9 @@
 
 import imaplib
 from datetime import datetime, UTC
-from imap_tools import AND
+from imap_tools.query import AND
 from mcp.server.fastmcp import FastMCP
-from ..state import get_state_or_error
+from ..state import get_mailbox
 
 
 def register_email_basic_operations_tools(mcp: FastMCP):
@@ -19,13 +19,11 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             limit: Maximum number of emails to return (default: 10)
             headers_only: If True, only fetch headers for faster loading (default: True)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Fetch all messages to sort by date, then take the most recent
-            all_messages = list(state.mailbox.fetch(headers_only=headers_only))
+            all_messages = list(mailbox.fetch(headers_only=headers_only))
 
             # Sort by date (most recent first) - handle timezone-aware dates properly
             def get_sort_date(msg):
@@ -66,8 +64,8 @@ def register_email_basic_operations_tools(mcp: FastMCP):
                 results.append(result)
 
             return {
-                "message": f"Retrieved {len(results)} emails from {state.mailbox.folder}",
-                "folder": state.mailbox.folder,
+                "message": f"Retrieved {len(results)} emails",
+                "folder": mailbox.folder,
                 "count": len(results),
                 "limit": limit,
                 "headers_only": headers_only,
@@ -89,16 +87,14 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             limit: Maximum number of emails to return (default: 10)
             headers_only: If True, only fetch headers for faster loading (default: True)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Create search criteria for sender
             criteria = AND(from_=sender)
 
             # Fetch messages
-            messages = state.mailbox.fetch(
+            messages = mailbox.fetch(
                 criteria, limit=limit, headers_only=headers_only
             )
 
@@ -125,7 +121,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             return {
                 "message": f"Found {len(results)} emails from '{sender}'",
                 "sender": sender,
-                "folder": state.mailbox.folder,
+                "folder": mailbox.folder,
                 "count": len(results),
                 "limit": limit,
                 "headers_only": headers_only,
@@ -147,16 +143,14 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             limit: Maximum number of emails to return (default: 10)
             headers_only: If True, only fetch headers for faster loading (default: True)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Create search criteria for subject
             criteria = AND(subject=subject)
 
             # Fetch messages
-            messages = state.mailbox.fetch(
+            messages = mailbox.fetch(
                 criteria, limit=limit, headers_only=headers_only
             )
 
@@ -183,7 +177,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             return {
                 "message": f"Found {len(results)} emails with subject containing '{subject}'",
                 "subject_filter": subject,
-                "folder": state.mailbox.folder,
+                "folder": mailbox.folder,
                 "count": len(results),
                 "limit": limit,
                 "headers_only": headers_only,
@@ -202,13 +196,11 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             count: Number of recent emails to retrieve (default: 5)
             headers_only: If True, only fetch headers for faster loading (default: True)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Fetch all messages to sort by date, then take the most recent
-            all_messages = list(state.mailbox.fetch(headers_only=headers_only))
+            all_messages = list(mailbox.fetch(headers_only=headers_only))
 
             # Sort by date (most recent first) - handle timezone-aware dates properly
             def get_sort_date(msg):
@@ -250,7 +242,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
 
             return {
                 "message": f"Retrieved {len(results)} most recent emails",
-                "folder": state.mailbox.folder,
+                "folder": mailbox.folder,
                 "count": len(results),
                 "requested_count": count,
                 "headers_only": headers_only,
@@ -268,14 +260,12 @@ def register_email_basic_operations_tools(mcp: FastMCP):
         Args:
             uid: Email UID to read
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Get the specific message using UID criteria
             message = None
-            for msg in state.mailbox.fetch(f"UID {uid}"):
+            for msg in mailbox.fetch(f"UID {uid}"):
                 message = msg
                 break
 
@@ -310,20 +300,19 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             return f"Failed to read email: {e!s}"
 
     @mcp.tool()
-    async def mark_as_read(uid: int):
+    async def mark_email_as_read(uid: int):
         """
-        Mark a specific email as read using its UID.
+        Mark a specific email as read.
 
         Args:
             uid: Email UID to mark as read
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
-            # Mark as read using the flag method
-            state.mailbox.flag(str(uid), r"\Seen", True)
+            # Mark as read
+            mailbox.flag(str(uid), r"\Seen", True)
+
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to mark email as read: {e!s}"
         else:
@@ -334,35 +323,25 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             }
 
     @mcp.tool()
-    async def delete_email(uid: int, expunge: bool = False):
+    async def delete_email(uid: int):
         """
-        Delete a specific email using its UID.
+        Delete a specific email.
 
         Args:
             uid: Email UID to delete
-            expunge: If True, permanently remove email; if False, just mark as deleted
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
-            # Mark as deleted using the underlying client to avoid automatic expunging
-            state.mailbox.client.uid("STORE", str(uid), "+FLAGS", r"(\Deleted)")
+            # Delete the email
+            mailbox.flag(str(uid), r"\Deleted", True)
+            mailbox.expunge()
 
-            result = {
-                "message": f"Successfully marked email UID {uid} for deletion",
-                "uid": uid,
-                "operation": "delete",
-                "expunged": False,
-            }
-
-            # Expunge if requested
-            if expunge:
-                state.mailbox.expunge()
-                result["message"] = f"Successfully deleted email UID {uid} permanently"
-                result["expunged"] = True
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to delete email: {e!s}"
         else:
-            return result
+            return {
+                "message": f"Successfully deleted email UID {uid}",
+                "uid": uid,
+                "operation": "delete",
+            }

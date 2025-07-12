@@ -1,10 +1,9 @@
 """Email attachment tools for IMAP server."""
 
-import base64
 import imaplib
 from pathlib import Path
 from mcp.server.fastmcp import FastMCP
-from ..state import get_state_or_error
+from ..state import get_mailbox
 
 
 def register_email_attachment_tools(mcp: FastMCP):
@@ -22,14 +21,12 @@ def register_email_attachment_tools(mcp: FastMCP):
             save_path: Directory to save attachments (optional)
             include_inline: Include inline attachments (default: False)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Get the specific message using UID criteria
             message = None
-            for msg in state.mailbox.fetch(f"UID {uid}"):
+            for msg in mailbox.fetch(f"UID {uid}"):
                 message = msg
                 break
 
@@ -47,7 +44,8 @@ def register_email_attachment_tools(mcp: FastMCP):
             # Filter attachments based on include_inline
             attachments_to_process = []
             for att in message.attachments:
-                if include_inline or not att.is_inline:
+                is_inline = att.content_disposition == 'inline'
+                if include_inline or not is_inline:
                     attachments_to_process.append(att)
 
             if not attachments_to_process:
@@ -58,90 +56,71 @@ def register_email_attachment_tools(mcp: FastMCP):
                     "attachments": [],
                 }
 
-            attachments_info = []
             saved_files = []
+            for i, attachment in enumerate(attachments_to_process):
+                filename = None  # Initialize filename variable
+                try:
+                    # Generate filename if not provided
+                    if attachment.filename:
+                        filename = attachment.filename
+                    else:
+                        # Create a filename based on content type and index
+                        ext = attachment.content_type.split('/')[-1] if '/' in attachment.content_type else 'bin'
+                        filename = f"attachment_{i+1}.{ext}"
 
-            for att in attachments_to_process:
-                att_info = {
-                    "filename": att.filename or "unnamed",
-                    "content_type": att.content_type,
-                    "size": len(att.payload) if att.payload else 0,
-                    "is_inline": att.is_inline,
-                    "content_id": getattr(att, "content_id", None),
-                }
-
-                # Save to disk if save_path provided
-                if save_path and att.payload:
-                    try:
-                        # Create directory if it doesn't exist
+                    # Save to specified path or current directory
+                    if save_path:
                         save_dir = Path(save_path)
                         save_dir.mkdir(parents=True, exist_ok=True)
-
-                        # Generate unique filename if needed
-                        filename = att.filename or f"attachment_{len(saved_files) + 1}"
                         file_path = save_dir / filename
+                    else:
+                        file_path = Path(filename)
 
-                        # Handle duplicate filenames
-                        counter = 1
-                        original_path = file_path
-                        while file_path.exists():
-                            stem = original_path.stem
-                            suffix = original_path.suffix
-                            file_path = (
-                                original_path.parent / f"{stem}_{counter}{suffix}"
-                            )
-                            counter += 1
+                    # Write attachment data
+                    with open(file_path, 'wb') as f:
+                        f.write(attachment.payload)
 
-                        # Write attachment to file
-                        with open(file_path, "wb") as f:
-                            f.write(att.payload)
+                    saved_files.append({
+                        "filename": filename,
+                        "path": str(file_path),
+                        "size": len(attachment.payload),
+                        "content_type": attachment.content_type,
+                        "content_id": attachment.content_id,
+                    })
 
-                        att_info["saved_path"] = str(file_path)
-                        saved_files.append(str(file_path))
-
-                    except (OSError, PermissionError) as e:
-                        att_info["save_error"] = f"Failed to save: {e!s}"
-                else:
-                    # Include base64 content if not saving to disk
-                    if att.payload:
-                        att_info["content_base64"] = base64.b64encode(
-                            att.payload
-                        ).decode()
-
-                attachments_info.append(att_info)
+                except Exception as e:
+                    saved_files.append({
+                        "filename": filename if filename else f"attachment_{i+1}",
+                        "error": f"Failed to save: {e!s}",
+                        "size": len(attachment.payload),
+                        "content_type": attachment.content_type,
+                    })
 
             return {
-                "message": f"Extracted {len(attachments_info)} attachments from email UID {uid}",
+                "message": f"Successfully extracted {len(saved_files)} attachments from email UID {uid}",
                 "email_subject": message.subject,
-                "email_from": message.from_,
-                "attachment_count": len(attachments_info),
-                "saved_to_disk": len(saved_files),
-                "save_path": save_path if save_path else None,
-                "attachments": attachments_info,
+                "email_uid": uid,
+                "attachment_count": len(saved_files),
+                "saved_files": saved_files,
             }
 
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to extract attachments: {e!s}"
-        except (OSError, PermissionError) as e:
-            return f"File system error: {e!s}"
 
     @mcp.tool()
-    async def list_email_attachments(uid: int, include_inline: bool = False):
+    async def list_attachments(uid: int):
         """
-        List attachments in a specific email without downloading them.
+        List attachments for a specific email without extracting them.
 
         Args:
             uid: Email UID
-            include_inline: Include inline attachments (default: False)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Get the specific message using UID criteria
             message = None
-            for msg in state.mailbox.fetch(f"UID {uid}"):
+            for msg in mailbox.fetch(f"UID {uid}"):
                 message = msg
                 break
 
@@ -152,56 +131,28 @@ def register_email_attachment_tools(mcp: FastMCP):
                 return {
                     "message": f"No attachments found in email UID {uid}",
                     "email_subject": message.subject,
-                    "email_from": message.from_,
-                    "email_date": message.date_str,
                     "attachment_count": 0,
                     "attachments": [],
                 }
 
-            # Filter and list attachments
             attachments_info = []
-            for att in message.attachments:
-                if include_inline or not att.is_inline:
-                    att_info = {
-                        "filename": att.filename or "unnamed",
-                        "content_type": att.content_type,
-                        "size": len(att.payload) if att.payload else 0,
-                        "size_formatted": _format_size(
-                            len(att.payload) if att.payload else 0
-                        ),
-                        "is_inline": att.is_inline,
-                        "content_id": getattr(att, "content_id", None),
-                    }
-                    attachments_info.append(att_info)
+            for i, attachment in enumerate(message.attachments):
+                attachments_info.append({
+                    "index": i + 1,
+                    "filename": attachment.filename or f"attachment_{i+1}",
+                    "content_type": attachment.content_type,
+                    "size": len(attachment.payload) if attachment.payload else 0,
+                    "content_id": attachment.content_id,
+                    "content_disposition": attachment.content_disposition,
+                })
 
             return {
-                "message": f"Found {len(attachments_info)} {'attachments' if include_inline else 'non-inline attachments'} in email UID {uid}",
+                "message": f"Found {len(attachments_info)} attachments in email UID {uid}",
                 "email_subject": message.subject,
-                "email_from": message.from_,
-                "email_date": message.date_str,
+                "email_uid": uid,
                 "attachment_count": len(attachments_info),
-                "total_size": sum(att["size"] for att in attachments_info),
-                "total_size_formatted": _format_size(
-                    sum(att["size"] for att in attachments_info)
-                ),
                 "attachments": attachments_info,
             }
 
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to list attachments: {e!s}"
-
-
-def _format_size(size_bytes: int) -> str:
-    """Format file size in human-readable format."""
-    if size_bytes == 0:
-        return "0 B"
-
-    size_names = ["B", "KB", "MB", "GB"]
-    size = float(size_bytes)
-    i = 0
-
-    while size >= 1024 and i < len(size_names) - 1:
-        size /= 1024
-        i += 1
-
-    return f"{size:.1f} {size_names[i]}"

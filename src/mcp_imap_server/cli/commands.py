@@ -192,7 +192,7 @@ def update_imap_account(
         new_server = imap_server or existing_server
         new_port = imap_port or existing_port
         new_ssl = use_ssl if use_ssl is not None else existing_ssl
-        cred_manager.update_account(
+        cred_manager.add_account(
             name=email,
             username=email,
             password=password,

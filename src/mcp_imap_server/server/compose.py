@@ -3,10 +3,9 @@
 import imaplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import email.utils
 
 from mcp.server.fastmcp import FastMCP
-from .state import get_state_or_error
+from .state import get_mailbox
 
 
 def register_compose_tools(mcp: FastMCP):
@@ -40,51 +39,53 @@ def register_compose_tools(mcp: FastMCP):
             reply_to: Reply-to address (optional)
             is_draft: Whether to mark email as draft (default: False)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Create the email message
-            if body_html and body_text:
-                # Create multipart message with both text and HTML
-                msg = MIMEMultipart("alternative")
-                text_part = MIMEText(body_text, "plain", "utf-8")
-                html_part = MIMEText(body_html, "html", "utf-8")
+            if body_html:
+                msg = MIMEMultipart('alternative')
+                msg['Subject'] = subject
+                msg['From'] = from_address
+                msg['To'] = to_addresses
+                msg['Cc'] = cc_addresses
+                msg['Bcc'] = bcc_addresses
+                if reply_to:
+                    msg['Reply-To'] = reply_to
+
+                # Add text and HTML parts
+                text_part = MIMEText(body_text, 'plain', 'utf-8')
+                html_part = MIMEText(body_html, 'html', 'utf-8')
                 msg.attach(text_part)
                 msg.attach(html_part)
-            elif body_html:
-                # HTML only
-                msg = MIMEText(body_html, "html", "utf-8")
             else:
-                # Plain text only (default if no body provided)
-                msg = MIMEText(body_text or "", "plain", "utf-8")
+                msg = MIMEText(body_text, 'plain', 'utf-8')
+                msg['Subject'] = subject
+                msg['From'] = from_address
+                msg['To'] = to_addresses
+                msg['Cc'] = cc_addresses
+                msg['Bcc'] = bcc_addresses
+                if reply_to:
+                    msg['Reply-To'] = reply_to
 
-            # Set email headers
-            msg["Subject"] = subject
-            msg["From"] = from_address
-            msg["To"] = to_addresses
-            msg["Date"] = email.utils.formatdate(localtime=True)
-            msg["Message-ID"] = email.utils.make_msgid()
-
-            if cc_addresses:
-                msg["Cc"] = cc_addresses
-            if bcc_addresses:
-                msg["Bcc"] = bcc_addresses
-            if reply_to:
-                msg["Reply-To"] = reply_to
-
-            # Set flags for the message
+            # Set draft flag if requested
             flags = []
             if is_draft:
-                flags.append(r"\Draft")
+                flags.append(r'\Draft')
 
-            # Convert message to bytes
+            # Convert message to bytes and append to the specified folder
             message_bytes = msg.as_bytes()
+            mailbox.append(message_bytes, folder, flag_set=flags)
 
-            # Append to the specified folder
-            state.mailbox.append(message_bytes, folder, flag_set=flags)
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
-            return f"Failed to create email: {e!s}"
+            return f"Failed to append email: {e!s}"
         else:
-            return f"Email successfully created and saved to '{folder}' folder."
+            return {
+                "message": f"Successfully appended email to folder '{folder}'",
+                "folder": folder,
+                "subject": subject,
+                "from": from_address,
+                "to": to_addresses,
+                "is_draft": is_draft,
+                "operation": "append",
+            }

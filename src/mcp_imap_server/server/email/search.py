@@ -2,9 +2,9 @@
 
 import imaplib
 from datetime import datetime
-from imap_tools import AND, OR
+from imap_tools.query import AND, OR
 from mcp.server.fastmcp import FastMCP
-from ..state import get_state_or_error
+from ..state import get_mailbox
 
 
 def register_email_search_tools(mcp: FastMCP):
@@ -22,9 +22,7 @@ def register_email_search_tools(mcp: FastMCP):
             end_date: End date in YYYY-MM-DD format (optional, defaults to start_date)
             headers_only: If True, only fetch headers for faster search (default: True)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Parse dates
@@ -38,7 +36,7 @@ def register_email_search_tools(mcp: FastMCP):
                 criteria = AND(date_gte=start, date_lt=end)
 
             # Fetch messages
-            messages = state.mailbox.fetch(criteria, headers_only=headers_only)
+            messages = mailbox.fetch(criteria, headers_only=headers_only)
 
             results = []
             for msg in messages:
@@ -85,9 +83,7 @@ def register_email_search_tools(mcp: FastMCP):
             max_size: Maximum size in bytes (0 for no maximum)
             headers_only: If True, only fetch headers for faster search (default: True)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         if min_size <= 0 and max_size <= 0:
             return "Please specify min_size and/or max_size greater than 0."
@@ -102,7 +98,7 @@ def register_email_search_tools(mcp: FastMCP):
                 criteria = AND(size_lt=max_size)
 
             # Fetch messages
-            messages = state.mailbox.fetch(criteria, headers_only=headers_only)
+            messages = mailbox.fetch(criteria, headers_only=headers_only)
 
             results = []
             for msg in messages:
@@ -152,9 +148,7 @@ def register_email_search_tools(mcp: FastMCP):
             search_subject: Search in subject line (default: False)
             headers_only: If True, only fetch headers (default: False, since we're searching content)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         if not search_body and not search_subject:
             return "Please enable search_body and/or search_subject."
@@ -169,7 +163,7 @@ def register_email_search_tools(mcp: FastMCP):
                 criteria = AND(subject=search_text)
 
             # Fetch messages
-            messages = state.mailbox.fetch(criteria, headers_only=headers_only)
+            messages = mailbox.fetch(criteria, headers_only=headers_only)
 
             results = []
             for msg in messages:
@@ -223,14 +217,12 @@ def register_email_search_tools(mcp: FastMCP):
             min_attachments: Minimum number of attachments (default: 1)
             headers_only: If True, only fetch headers for faster search (default: True)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Fetch all messages and filter by attachment count
             # Note: IMAP doesn't have a direct "has attachments" search, so we fetch and filter
-            messages = state.mailbox.fetch(headers_only=headers_only)
+            messages = mailbox.fetch(headers_only=headers_only)
 
             results = []
             for msg in messages:
@@ -281,9 +273,7 @@ def register_email_search_tools(mcp: FastMCP):
             answered: True for answered emails, False for not answered, None to ignore
             headers_only: If True, only fetch headers for faster search (default: True)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         # Build search criteria based on flags
         criteria_kwargs = {}
@@ -317,7 +307,7 @@ def register_email_search_tools(mcp: FastMCP):
             criteria = AND(**criteria_kwargs)
 
             # Fetch messages
-            messages = state.mailbox.fetch(criteria, headers_only=headers_only)
+            messages = mailbox.fetch(criteria, headers_only=headers_only)
 
             results = []
             for msg in messages:
@@ -380,9 +370,7 @@ def register_email_search_tools(mcp: FastMCP):
             is_flagged: True for flagged emails, False for unflagged, None to ignore
             headers_only: If True, only fetch headers for faster search (default: True)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         # Build search criteria
         criteria_parts = []
@@ -440,7 +428,7 @@ def register_email_search_tools(mcp: FastMCP):
                 final_criteria = AND(*criteria_parts)
 
             # Fetch messages
-            messages = state.mailbox.fetch(final_criteria, headers_only=headers_only)
+            messages = mailbox.fetch(final_criteria, headers_only=headers_only)
 
             results = []
             for msg in messages:

@@ -1,7 +1,20 @@
 """State management for the IMAP server."""
 
 from dataclasses import dataclass
-from imap_tools import MailBox
+from typing import cast
+from imap_tools.mailbox import MailBox
+from mcp.server.fastmcp.server import Context
+from mcp.server.session import ServerSession
+from starlette.requests import Request
+
+
+
+
+class NotLoggedInError(RuntimeError):
+    """Raised when trying to access mailbox without being logged in."""
+    
+    def __init__(self):
+        super().__init__("Not logged in. Please login first.")
 
 
 @dataclass
@@ -11,9 +24,9 @@ class ImapState:
     mailbox: MailBox | None = None
 
 
-def get_state_or_error(context):
-    """Get the IMAP state from context or return error message."""
-    state = context.request_context.lifespan_context
+def get_mailbox(context: Context[ServerSession, object, Request]) -> MailBox:
+    """Get the mailbox from context or raise NotLoggedInError if not logged in."""
+    state = cast("ImapState", context.request_context.lifespan_context)
     if not state.mailbox:
-        return None, "Not logged in. Please login first."
-    return state, None
+        raise NotLoggedInError()
+    return state.mailbox

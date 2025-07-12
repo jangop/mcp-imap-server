@@ -2,7 +2,7 @@
 
 import imaplib
 from mcp.server.fastmcp import FastMCP
-from ..state import get_state_or_error
+from ..state import get_mailbox
 
 
 def register_folder_management_tools(mcp: FastMCP):
@@ -10,17 +10,17 @@ def register_folder_management_tools(mcp: FastMCP):
 
     @mcp.tool()
     async def list_folders():
-        """List all available folders/mailboxes."""
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        """
+        List all available folders/mailboxes.
+        """
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Get list of folders
             folder_list = []
             try:
                 # Use the folder manager to get folder information
-                folder_manager = state.mailbox.folder
+                folder_manager = mailbox.folder
                 # Get all folder information - this should return folder objects
                 folders = folder_manager.list()
                 for folder_info in folders:
@@ -39,7 +39,7 @@ def register_folder_management_tools(mcp: FastMCP):
                 # Fallback: just return the current folder
                 folder_list = [
                     {
-                        "name": str(state.mailbox.folder),
+                        "name": str(mailbox.folder.get()),
                         "delimiter": "/",
                         "flags": [],
                     }
@@ -47,7 +47,7 @@ def register_folder_management_tools(mcp: FastMCP):
 
             return {
                 "message": f"Found {len(folder_list)} folders",
-                "current_folder": state.mailbox.folder,
+                "current_folder": mailbox.folder.get() or "INBOX",
                 "total_folders": len(folder_list),
                 "folders": folder_list,
             }
@@ -63,14 +63,12 @@ def register_folder_management_tools(mcp: FastMCP):
         Args:
             folder_name: Name of the folder to select
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Select the folder
-            state.mailbox.folder.set(folder_name)
-            status = state.mailbox.folder.status(folder_name)
+            mailbox.folder.set(folder_name)
+            status = mailbox.folder.status(folder_name)
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to select folder: {e!s}"
         else:
@@ -88,13 +86,11 @@ def register_folder_management_tools(mcp: FastMCP):
         Args:
             folder_name: Name of the folder to create
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Create the folder
-            state.mailbox.folder.create(folder_name)
+            mailbox.folder.create(folder_name)
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to create folder: {e!s}"
         else:
@@ -112,13 +108,11 @@ def register_folder_management_tools(mcp: FastMCP):
         Args:
             folder_name: Name of the folder to delete
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Delete the folder
-            state.mailbox.folder.delete(folder_name)
+            mailbox.folder.delete(folder_name)
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to delete folder: {e!s}"
         else:
@@ -137,13 +131,11 @@ def register_folder_management_tools(mcp: FastMCP):
             old_name: Current name of the folder
             new_name: New name for the folder
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Rename the folder
-            state.mailbox.folder.rename(old_name, new_name)
+            mailbox.folder.rename(old_name, new_name)
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to rename folder: {e!s}"
         else:
@@ -162,13 +154,11 @@ def register_folder_management_tools(mcp: FastMCP):
         Args:
             folder_name: Name of the folder to subscribe to
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Subscribe to the folder
-            state.mailbox.folder.subscribe(folder_name)
+            mailbox.folder.subscribe(folder_name, True)
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to subscribe to folder: {e!s}"
         else:
@@ -186,13 +176,11 @@ def register_folder_management_tools(mcp: FastMCP):
         Args:
             folder_name: Name of the folder to unsubscribe from
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Unsubscribe from the folder
-            state.mailbox.folder.unsubscribe(folder_name)
+            mailbox.folder.subscribe(folder_name, False)
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to unsubscribe from folder: {e!s}"
         else:
@@ -210,17 +198,15 @@ def register_folder_management_tools(mcp: FastMCP):
         Args:
             folder_name: Name of the folder (empty for current folder)
         """
-        state, error = get_state_or_error(mcp.get_context())
-        if error:
-            return error
+        mailbox = get_mailbox(mcp.get_context())
 
         try:
             # Use current folder if none specified
             if not folder_name:
-                folder_name = state.mailbox.folder
+                folder_name = mailbox.folder.get() or "INBOX"
 
             # Get folder status
-            status = state.mailbox.folder.status(folder_name)
+            status = mailbox.folder.status(folder_name)
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to get folder status: {e!s}"
         else:

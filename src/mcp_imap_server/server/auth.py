@@ -2,10 +2,14 @@
 
 import imaplib
 import ssl
-from imap_tools import MailBox
+from typing import cast, TYPE_CHECKING
+from imap_tools.mailbox import MailBox
 from mcp.server.fastmcp import FastMCP
 
 from ..shared.credentials import credential_manager
+
+if TYPE_CHECKING:
+    from .state import ImapState
 
 
 def register_auth_tools(mcp: FastMCP):
@@ -21,11 +25,12 @@ def register_auth_tools(mcp: FastMCP):
             password: IMAP password
             server: IMAP server hostname
         """
-        state = mcp.get_context().request_context.lifespan_context
+        state = cast("ImapState", mcp.get_context().request_context.lifespan_context)
 
         try:
-            state.mailbox = MailBox(server)
-            state.mailbox.login(username, password)
+            mailbox = MailBox(server)
+            mailbox.login(username, password)
+            state.mailbox = mailbox
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Login failed: {e!s}"
         except (OSError, ssl.SSLError) as e:
@@ -36,7 +41,7 @@ def register_auth_tools(mcp: FastMCP):
     @mcp.tool()
     async def logout():
         """Log out of the IMAP server."""
-        state = mcp.get_context().request_context.lifespan_context
+        state = cast("ImapState", mcp.get_context().request_context.lifespan_context)
 
         if not state.mailbox:
             return "Not logged in. Please login first."
@@ -75,10 +80,11 @@ def register_auth_tools(mcp: FastMCP):
             if not credentials:
                 return f"Account '{account_name}' not found. Use list_stored_accounts to see available accounts."
 
-            state = mcp.get_context().request_context.lifespan_context
+            state = cast("ImapState", mcp.get_context().request_context.lifespan_context)
 
-            state.mailbox = MailBox(credentials.server)
-            state.mailbox.login(credentials.username, credentials.password)
+            mailbox = MailBox(credentials.server)
+            mailbox.login(credentials.username, credentials.password)
+            state.mailbox = mailbox
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Login failed for account '{account_name}': {e!s}"
         except (OSError, ssl.SSLError) as e:
