@@ -37,7 +37,33 @@ A comprehensive Model Context Protocol (MCP) server for full-featured IMAP email
 
 ## Installation
 
-### MCP
+Depending on your setup, you probably want your agent to handle the server,
+so you will not need to install/launch manually.
+However, to manage credentials (your imap server, username, and password),
+you should use the command line interface.
+
+With [uv](https://github.com/astral-sh/uv), this becomes trivial.
+
+### Prerequisites
+
+- [Install uv](https://docs.astral.sh/uv/getting-started/installation/) if you have not done so already.
+
+### Add Credentials via the Command Line Interface
+
+Use `uvx` to [invoke the application without installing](https://docs.astral.sh/uv/guides/tools/) it:
+
+```bash
+uvx --from git+https://github.com/jangop/mcp-imap-server mcp-imap-credentials add
+```
+
+Enter your credentials as requested.
+They will be stored locally and securely.
+
+Alternatively, install the application -- but why?
+
+### Run MCP Server
+
+You could use `uv`/`uvx` to install/run the server, but you probably want your agent (the MCP client) to handle it.
 
 Depending on your setup, you probably want your agent to handle the server.
 Use the following in your configuration:
@@ -51,90 +77,29 @@ Use the following in your configuration:
   }
 ```
 
-### Command Line Interface
+#### Gemini CLI
 
-To manage credentials, install the package.
+For example, to configure [Gemini CLI](https://github.com/google-gemini/gemini-cli) to use this server,
+place the following in `~/.gemini/extensions/mcp-imap-server/gemini-extension.json`,
+to [install the server as an extension](https://github.com/google-gemini/gemini-cli/blob/main/docs/extension.md):
 
-#### Prerequisites
+```json
+{
+  "name": "mcp-imap-server",
+  "version": "0.0.1",
+  "mcpServers": {
+    "mcp-imap-server": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/jangop/mcp-imap-server", "mcp-imap-server"]
+    }
+  }
+}
+```
 
-- Python 3.13 or higher
-- `uv` package manager (recommended)
-
-#### Install with uv
+Then, just [launch Gemini CLI](https://github.com/google-gemini/gemini-cli?tab=readme-ov-file#quickstart):
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd mcp-imap-server
-
-# Install dependencies
-uv sync
-
-# Install the package
-uv pip install .
-```
-
-## Quick Start
-
-### 1. Add an IMAP Account
-
-```bash
-# Add your first IMAP account
-mcp-imap-credentials add your-email@example.com your-password imap.gmail.com
-
-# For Gmail with app password (untested)
-mcp-imap-credentials add your-email@gmail.com your-app-password imap.gmail.com
-
-# For Outlook/Office365 (untested)
-mcp-imap-credentials add your-email@outlook.com your-password outlook.office365.com
-```
-
-### 2. List and Test Accounts
-
-```bash
-# List all configured accounts with connection testing
-mcp-imap-credentials list
-
-# List without testing connections
-mcp-imap-credentials list --no-test
-```
-
-### 3. Run the MCP Server
-
-```bash
-# Start the MCP server
-mcp-imap-server
-```
-
-## CLI Commands
-
-### Account Management
-
-```sh
-# Add a new account
-mcp-imap-credentials add <email> <password> <server> [--port 993] [--no-ssl]
-
-# Remove an account
-mcp-imap-credentials remove <email>
-
-# Update an account
-mcp-imap-credentials update <email> [--password <new-password>] [--server <new-server>]
-
-# Test connection for a stored account
-mcp-imap-credentials test <email>
-```
-
-### Examples
-
-```sh
-# Add Gmail account
-mcp-imap-credentials add user@gmail.com app-password imap.gmail.com
-
-# Add Outlook account with custom port
-mcp-imap-credentials add user@outlook.com password outlook.office365.com --port 993
-
-# Update password for existing account
-mcp-imap-credentials update user@gmail.com --password new-app-password
+npx https://github.com/google-gemini/gemini-cli
 ```
 
 ## MCP Tools Available
