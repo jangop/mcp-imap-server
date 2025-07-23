@@ -18,7 +18,7 @@ class ContentFormat(StrEnum):
     ALL = "all"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AttachmentInfo:
     """Email attachment information."""
 
@@ -27,7 +27,7 @@ class AttachmentInfo:
     size: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class EmailObject:
     """Basic email object with headers and optional content."""
 
@@ -45,7 +45,7 @@ class EmailObject:
     attachment_count: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DetailedEmail:
     """Detailed email object with full metadata and content."""
 
