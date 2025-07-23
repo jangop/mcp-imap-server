@@ -205,7 +205,7 @@ src/mcp_imap_server/
 │   │   ├── attachments.py
 │   │   ├── basic_operations.py
 │   │   ├── bulk_operations.py
-│   │   ├── content_processor.py  # Intelligent content processing
+│   │   ├── content_processing.py  # Intelligent content processing & formatting
 │   │   └── search.py
 │   ├── folder/         # Folder management
 │   │   ├── management.py

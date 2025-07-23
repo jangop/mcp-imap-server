@@ -5,7 +5,7 @@ from datetime import datetime, UTC
 from imap_tools.query import AND
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
-from .content_processor import content_processor, ContentFormat
+from .content_processing import ContentFormat, build_email_list, build_single_email
 
 
 def register_email_basic_operations_tools(mcp: FastMCP):
@@ -49,26 +49,8 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             # Take the most recent ones
             recent_messages = sorted_messages[:limit]
 
-            results = []
-            for msg in recent_messages:
-                result = {
-                    "uid": msg.uid,
-                    "from": msg.from_,
-                    "subject": msg.subject,
-                    "date": msg.date_str,
-                    "size": msg.size,
-                    "flags": list(msg.flags),
-                }
-                if not headers_only:
-                    # Process content based on format preference
-                    content_fields = content_processor.process_email_content(
-                        text_content=msg.text,
-                        html_content=msg.html,
-                        content_format=content_format,
-                    )
-                    result.update(content_fields)
-                    result["attachment_count"] = len(msg.attachments)
-                results.append(result)
+            # Build email list using centralized formatting functions
+            results = build_email_list(recent_messages, headers_only, content_format)
 
             return {
                 "message": f"Retrieved {len(results)} emails",
@@ -108,26 +90,8 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             # Fetch messages
             messages = mailbox.fetch(criteria, limit=limit, headers_only=headers_only)
 
-            results = []
-            for msg in messages:
-                result = {
-                    "uid": msg.uid,
-                    "from": msg.from_,
-                    "subject": msg.subject,
-                    "date": msg.date_str,
-                    "size": msg.size,
-                    "flags": list(msg.flags),
-                }
-                if not headers_only:
-                    # Process content based on format preference
-                    content_fields = content_processor.process_email_content(
-                        text_content=msg.text,
-                        html_content=msg.html,
-                        content_format=content_format,
-                    )
-                    result.update(content_fields)
-                    result["attachment_count"] = len(msg.attachments)
-                results.append(result)
+            # Build email list using centralized formatting functions
+            results = build_email_list(messages, headers_only, content_format)
 
             return {
                 "message": f"Found {len(results)} emails from '{sender}'",
@@ -168,26 +132,8 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             # Fetch messages
             messages = mailbox.fetch(criteria, limit=limit, headers_only=headers_only)
 
-            results = []
-            for msg in messages:
-                result = {
-                    "uid": msg.uid,
-                    "from": msg.from_,
-                    "subject": msg.subject,
-                    "date": msg.date_str,
-                    "size": msg.size,
-                    "flags": list(msg.flags),
-                }
-                if not headers_only:
-                    # Process content based on format preference
-                    content_fields = content_processor.process_email_content(
-                        text_content=msg.text,
-                        html_content=msg.html,
-                        content_format=content_format,
-                    )
-                    result.update(content_fields)
-                    result["attachment_count"] = len(msg.attachments)
-                results.append(result)
+            # Build email list using centralized formatting functions
+            results = build_email_list(messages, headers_only, content_format)
 
             return {
                 "message": f"Found {len(results)} emails with subject containing '{subject}'",
@@ -241,26 +187,8 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             # Take the most recent ones
             recent_messages = sorted_messages[:count]
 
-            results = []
-            for msg in recent_messages:
-                result = {
-                    "uid": msg.uid,
-                    "from": msg.from_,
-                    "subject": msg.subject,
-                    "date": msg.date_str,
-                    "size": msg.size,
-                    "flags": list(msg.flags),
-                }
-                if not headers_only:
-                    # Process content based on format preference
-                    content_fields = content_processor.process_email_content(
-                        text_content=msg.text,
-                        html_content=msg.html,
-                        content_format=content_format,
-                    )
-                    result.update(content_fields)
-                    result["attachment_count"] = len(msg.attachments)
-                results.append(result)
+            # Build email list using centralized formatting functions
+            results = build_email_list(recent_messages, headers_only, content_format)
 
             return {
                 "message": f"Retrieved {len(results)} most recent emails",
@@ -298,41 +226,18 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             if not message:
                 return f"Email with UID {uid} not found."
 
-            # Process content based on format preference
-            content_fields = content_processor.process_email_content(
-                text_content=message.text,
-                html_content=message.html,
-                content_format=content_format,
+            # Build single email response using centralized formatting functions
+            result = build_single_email(
+                message, content_format, include_attachments=True
             )
 
-            result = {
-                "message": f"Email content for UID {uid}",
-                "uid": uid,
-                "from": message.from_,
-                "to": message.to,
-                "cc": message.cc,
-                "bcc": message.bcc,
-                "subject": message.subject,
-                "date": message.date_str,
-                "size": message.size,
-                "flags": list(message.flags),
-                "content_format": content_format,
-                "attachment_count": len(message.attachments),
-                "attachments": [
-                    {
-                        "filename": att.filename or "unnamed",
-                        "content_type": att.content_type,
-                        "size": len(att.payload) if att.payload else 0,
-                    }
-                    for att in message.attachments
-                ],
-            }
+            # Add specific metadata for read_email function
+            result["message"] = f"Email content for UID {uid}"
+            result["content_format"] = content_format
 
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to read email: {e!s}"
         else:
-            # Add processed content fields
-            result.update(content_fields)
             return result
 
     @mcp.tool()

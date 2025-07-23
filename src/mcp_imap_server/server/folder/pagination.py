@@ -4,7 +4,7 @@ import imaplib
 from imap_tools.query import OR
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
-from ..email.content_processor import content_processor, ContentFormat
+from ..email.content_processing import ContentFormat, build_email_list
 
 
 def register_folder_pagination_tools(mcp: FastMCP):
@@ -86,27 +86,8 @@ def register_folder_pagination_tools(mcp: FastMCP):
             uid_criteria = " OR ".join([f"UID {uid}" for uid in page_uids])
             page_messages = list(mailbox.fetch(uid_criteria, headers_only=headers_only))
 
-            # Format results
-            results = []
-            for msg in page_messages:
-                result = {
-                    "uid": msg.uid,
-                    "from": msg.from_,
-                    "subject": msg.subject,
-                    "date": msg.date_str,
-                    "size": msg.size,
-                    "flags": list(msg.flags),
-                }
-                if not headers_only:
-                    # Process content based on format preference
-                    content_fields = content_processor.process_email_content(
-                        text_content=msg.text,
-                        html_content=msg.html,
-                        content_format=content_format,
-                    )
-                    result.update(content_fields)
-                    result["attachment_count"] = len(msg.attachments)
-                results.append(result)
+            # Format results using centralized formatting functions
+            results = build_email_list(page_messages, headers_only, content_format)
 
             # Restore original folder if we changed it
             if folder_name != original_folder:
@@ -194,27 +175,8 @@ def register_folder_pagination_tools(mcp: FastMCP):
             # Get messages for this page
             page_messages = matching_messages[start_idx:end_idx]
 
-            # Format results
-            results = []
-            for msg in page_messages:
-                result = {
-                    "uid": msg.uid,
-                    "from": msg.from_,
-                    "subject": msg.subject,
-                    "date": msg.date_str,
-                    "size": msg.size,
-                    "flags": list(msg.flags),
-                }
-                if not headers_only:
-                    # Process content based on format preference
-                    content_fields = content_processor.process_email_content(
-                        text_content=msg.text,
-                        html_content=msg.html,
-                        content_format=content_format,
-                    )
-                    result.update(content_fields)
-                    result["attachment_count"] = len(msg.attachments)
-                results.append(result)
+            # Format results using centralized formatting functions
+            results = build_email_list(page_messages, headers_only, content_format)
 
             # Restore original folder if we changed it
             if folder_name != original_folder:
@@ -321,27 +283,8 @@ def register_folder_pagination_tools(mcp: FastMCP):
             # Get messages for this page
             page_messages = matching_messages[start_idx:end_idx]
 
-            # Format results
-            results = []
-            for msg in page_messages:
-                result = {
-                    "uid": msg.uid,
-                    "from": msg.from_,
-                    "subject": msg.subject,
-                    "date": msg.date_str,
-                    "size": msg.size,
-                    "flags": list(msg.flags),
-                }
-                if not headers_only:
-                    # Process content based on format preference
-                    content_fields = content_processor.process_email_content(
-                        text_content=msg.text,
-                        html_content=msg.html,
-                        content_format=content_format,
-                    )
-                    result.update(content_fields)
-                    result["attachment_count"] = len(msg.attachments)
-                results.append(result)
+            # Format results using centralized formatting functions
+            results = build_email_list(page_messages, headers_only, content_format)
 
             # Restore original folder if we changed it
             if folder_name != original_folder:
