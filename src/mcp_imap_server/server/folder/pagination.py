@@ -26,7 +26,9 @@ def register_folder_pagination_tools(mcp: FastMCP):
             page_size: Number of emails per page
             folder_name: Name of the folder (empty for current folder)
             headers_only: If True, only fetch headers for faster loading
-            content_format: Content format from ContentFormat enum
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -129,6 +131,9 @@ def register_folder_pagination_tools(mcp: FastMCP):
             page_size: Number of emails per page
             folder_name: Name of the folder (empty for current folder)
             headers_only: If True, only fetch headers for faster loading
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -219,6 +224,9 @@ def register_folder_pagination_tools(mcp: FastMCP):
             page_size: Number of emails per page
             folder_name: Name of the folder (empty for current folder)
             headers_only: If True, only fetch headers for faster loading
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 

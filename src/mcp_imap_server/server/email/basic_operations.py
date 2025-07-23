@@ -23,7 +23,9 @@ def register_email_basic_operations_tools(mcp: FastMCP):
         Args:
             limit: Maximum number of emails to return (default: 10)
             headers_only: If True, only fetch headers for faster loading (default: True)
-            content_format: Content format ("default", "original_plaintext", "original_html", "markdown_from_html", "all")
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -79,7 +81,9 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             sender: Sender email address to filter by
             limit: Maximum number of emails to return (default: 10)
             headers_only: If True, only fetch headers for faster loading (default: True)
-            content_format: Content format from ContentFormat enum
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -121,7 +125,9 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             subject: Subject text to search for
             limit: Maximum number of emails to return (default: 10)
             headers_only: If True, only fetch headers for faster loading (default: True)
-            content_format: Content format from ContentFormat enum
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -161,7 +167,9 @@ def register_email_basic_operations_tools(mcp: FastMCP):
         Args:
             count: Number of recent emails to retrieve (default: 5)
             headers_only: If True, only fetch headers for faster loading (default: True)
-            content_format: Content format from ContentFormat enum
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -212,7 +220,9 @@ def register_email_basic_operations_tools(mcp: FastMCP):
 
         Args:
             uid: Email UID to read
-            content_format: Content format from ContentFormat enum
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 

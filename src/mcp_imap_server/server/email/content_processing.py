@@ -96,7 +96,9 @@ class EmailContentProcessor:
         Args:
             text_content: Original plaintext content from email
             html_content: Original HTML content from email
-            content_format: Desired format from ContentFormat enum
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
 
         Returns:
             Dict containing only the requested content fields with explicit names

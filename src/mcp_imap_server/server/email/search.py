@@ -30,7 +30,9 @@ def register_email_search_tools(mcp: FastMCP):
             start_date: Start date in YYYY-MM-DD format
             end_date: End date in YYYY-MM-DD format (optional, defaults to start_date)
             headers_only: If True, only fetch headers for faster search (default: True)
-            content_format: Content format ("default", "original_plaintext", "original_html", "markdown_from_html", "all")
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -80,7 +82,9 @@ def register_email_search_tools(mcp: FastMCP):
             min_size: Minimum size in bytes (0 for no minimum)
             max_size: Maximum size in bytes (0 for no maximum)
             headers_only: If True, only fetch headers for faster search (default: True)
-            content_format: Content format from ContentFormat enum
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -132,7 +136,9 @@ def register_email_search_tools(mcp: FastMCP):
             search_body: Search in email body (default: True)
             search_subject: Search in subject line (default: False)
             headers_only: If True, only fetch headers (default: False, since we're searching content)
-            content_format: Content format from ContentFormat enum
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -187,7 +193,9 @@ def register_email_search_tools(mcp: FastMCP):
         Args:
             min_attachments: Minimum number of attachments (default: 1)
             headers_only: If True, only fetch headers for faster search (default: True)
-            content_format: Content format from ContentFormat enum
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -239,7 +247,9 @@ def register_email_search_tools(mcp: FastMCP):
             draft: True for draft emails, False for not draft, None to ignore
             answered: True for answered emails, False for not answered, None to ignore
             headers_only: If True, only fetch headers for faster search (default: True)
-            content_format: Content format from ContentFormat enum
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -338,7 +348,9 @@ def register_email_search_tools(mcp: FastMCP):
             is_unread: True for unread emails, False for read, None to ignore
             is_flagged: True for flagged emails, False for unflagged, None to ignore
             headers_only: If True, only fetch headers for faster search (default: True)
-            content_format: Content format ("default", "original_plaintext", "original_html", "markdown_from_html", "all")
+            content_format: How to format email content - "default" (smart: meaningful plaintext or HTML→markdown),
+                          "original_plaintext" (raw text), "original_html" (raw HTML),
+                          "markdown_from_html" (clean markdown from HTML), "all" (all formats)
         """
         mailbox = get_mailbox(mcp.get_context())
 
