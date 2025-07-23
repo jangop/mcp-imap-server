@@ -66,9 +66,15 @@ def register_folder_statistics_tools(mcp: FastMCP):
                         flagged_count += 1
 
             # Calculate percentages
-            read_percentage = (read_count / total_messages * 100) if total_messages > 0 else 0
-            unread_percentage = (unread_count / total_messages * 100) if total_messages > 0 else 0
-            flagged_percentage = (flagged_count / total_messages * 100) if total_messages > 0 else 0
+            read_percentage = (
+                (read_count / total_messages * 100) if total_messages > 0 else 0
+            )
+            unread_percentage = (
+                (unread_count / total_messages * 100) if total_messages > 0 else 0
+            )
+            flagged_percentage = (
+                (flagged_count / total_messages * 100) if total_messages > 0 else 0
+            )
 
             return {
                 "message": f"Statistics for folder '{folder_name}'",
@@ -218,7 +224,9 @@ def register_folder_statistics_tools(mcp: FastMCP):
             monthly_distribution = {}
             for date in dates:
                 month_key = f"{date.year}-{date.month:02d}"
-                monthly_distribution[month_key] = monthly_distribution.get(month_key, 0) + 1
+                monthly_distribution[month_key] = (
+                    monthly_distribution.get(month_key, 0) + 1
+                )
 
             # Restore original folder if we changed it
             if folder_name != original_folder and mailbox:

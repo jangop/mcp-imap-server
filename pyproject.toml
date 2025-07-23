@@ -1,6 +1,6 @@
 [project]
 name = "mcp-imap-server"
-version = "0.1.0"
+version = "0.2.0"
 description = "A comprehensive Model Context Protocol (MCP) server for full-featured IMAP email management with advanced search, bulk operations, and secure credential storage"
 readme = "README.md"
 license = {text = "MIT"}
@@ -13,6 +13,7 @@ dependencies = [
     "rich>=13.0.0",
     "keyring>=25.0.0",
     "tomlkit>=0.13.0",
+    "html-to-markdown[lxml]>=1.8.0",
 ]
 
 [project.scripts]

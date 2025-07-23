@@ -5,19 +5,25 @@ from datetime import datetime, UTC
 from imap_tools.query import AND
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
+from .content_processor import content_processor, ContentFormat
 
 
 def register_email_basic_operations_tools(mcp: FastMCP):
     """Register email basic operations tools with the MCP server."""
 
     @mcp.tool()
-    async def list_emails(limit: int = 10, headers_only: bool = True):
+    async def list_emails(
+        limit: int = 10,
+        headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
+    ):
         """
         List recent emails from the current folder.
 
         Args:
             limit: Maximum number of emails to return (default: 10)
             headers_only: If True, only fetch headers for faster loading (default: True)
+            content_format: Content format ("default", "original_plaintext", "original_html", "markdown_from_html", "all")
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -54,13 +60,14 @@ def register_email_basic_operations_tools(mcp: FastMCP):
                     "flags": list(msg.flags),
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text,
-                            "html": msg.html,
-                            "attachment_count": len(msg.attachments),
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+                    result.update(content_fields)
+                    result["attachment_count"] = len(msg.attachments)
                 results.append(result)
 
             return {
@@ -69,6 +76,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
                 "count": len(results),
                 "limit": limit,
                 "headers_only": headers_only,
+                "content_format": content_format,
                 "emails": results,
             }
 
@@ -77,7 +85,10 @@ def register_email_basic_operations_tools(mcp: FastMCP):
 
     @mcp.tool()
     async def filter_emails_by_sender(
-        sender: str, limit: int = 10, headers_only: bool = True
+        sender: str,
+        limit: int = 10,
+        headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
     ):
         """
         Filter emails by sender address.
@@ -86,6 +97,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             sender: Sender email address to filter by
             limit: Maximum number of emails to return (default: 10)
             headers_only: If True, only fetch headers for faster loading (default: True)
+            content_format: Content format from ContentFormat enum
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -94,9 +106,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             criteria = AND(from_=sender)
 
             # Fetch messages
-            messages = mailbox.fetch(
-                criteria, limit=limit, headers_only=headers_only
-            )
+            messages = mailbox.fetch(criteria, limit=limit, headers_only=headers_only)
 
             results = []
             for msg in messages:
@@ -109,13 +119,14 @@ def register_email_basic_operations_tools(mcp: FastMCP):
                     "flags": list(msg.flags),
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text,
-                            "html": msg.html,
-                            "attachment_count": len(msg.attachments),
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+                    result.update(content_fields)
+                    result["attachment_count"] = len(msg.attachments)
                 results.append(result)
 
             return {
@@ -125,6 +136,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
                 "count": len(results),
                 "limit": limit,
                 "headers_only": headers_only,
+                "content_format": content_format,
                 "emails": results,
             }
 
@@ -133,7 +145,10 @@ def register_email_basic_operations_tools(mcp: FastMCP):
 
     @mcp.tool()
     async def filter_emails_by_subject(
-        subject: str, limit: int = 10, headers_only: bool = True
+        subject: str,
+        limit: int = 10,
+        headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
     ):
         """
         Filter emails by subject line (partial match).
@@ -142,6 +157,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             subject: Subject text to search for
             limit: Maximum number of emails to return (default: 10)
             headers_only: If True, only fetch headers for faster loading (default: True)
+            content_format: Content format from ContentFormat enum
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -150,9 +166,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             criteria = AND(subject=subject)
 
             # Fetch messages
-            messages = mailbox.fetch(
-                criteria, limit=limit, headers_only=headers_only
-            )
+            messages = mailbox.fetch(criteria, limit=limit, headers_only=headers_only)
 
             results = []
             for msg in messages:
@@ -165,13 +179,14 @@ def register_email_basic_operations_tools(mcp: FastMCP):
                     "flags": list(msg.flags),
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text,
-                            "html": msg.html,
-                            "attachment_count": len(msg.attachments),
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+                    result.update(content_fields)
+                    result["attachment_count"] = len(msg.attachments)
                 results.append(result)
 
             return {
@@ -181,6 +196,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
                 "count": len(results),
                 "limit": limit,
                 "headers_only": headers_only,
+                "content_format": content_format,
                 "emails": results,
             }
 
@@ -188,13 +204,18 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             return f"Failed to filter emails by subject: {e!s}"
 
     @mcp.tool()
-    async def get_recent_emails(count: int = 5, headers_only: bool = True):
+    async def get_recent_emails(
+        count: int = 5,
+        headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
+    ):
         """
         Get the most recent emails from the current folder.
 
         Args:
             count: Number of recent emails to retrieve (default: 5)
             headers_only: If True, only fetch headers for faster loading (default: True)
+            content_format: Content format from ContentFormat enum
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -231,13 +252,14 @@ def register_email_basic_operations_tools(mcp: FastMCP):
                     "flags": list(msg.flags),
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text,
-                            "html": msg.html,
-                            "attachment_count": len(msg.attachments),
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+                    result.update(content_fields)
+                    result["attachment_count"] = len(msg.attachments)
                 results.append(result)
 
             return {
@@ -246,6 +268,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
                 "count": len(results),
                 "requested_count": count,
                 "headers_only": headers_only,
+                "content_format": content_format,
                 "emails": results,
             }
 
@@ -253,12 +276,15 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             return f"Failed to get recent emails: {e!s}"
 
     @mcp.tool()
-    async def read_email(uid: int):
+    async def read_email(
+        uid: int, content_format: ContentFormat = ContentFormat.DEFAULT
+    ):
         """
         Read a specific email by its UID and return full content.
 
         Args:
             uid: Email UID to read
+            content_format: Content format from ContentFormat enum
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -272,7 +298,14 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             if not message:
                 return f"Email with UID {uid} not found."
 
-            return {
+            # Process content based on format preference
+            content_fields = content_processor.process_email_content(
+                text_content=message.text,
+                html_content=message.html,
+                content_format=content_format,
+            )
+
+            result = {
                 "message": f"Email content for UID {uid}",
                 "uid": uid,
                 "from": message.from_,
@@ -283,8 +316,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
                 "date": message.date_str,
                 "size": message.size,
                 "flags": list(message.flags),
-                "text": message.text,
-                "html": message.html,
+                "content_format": content_format,
                 "attachment_count": len(message.attachments),
                 "attachments": [
                     {
@@ -298,6 +330,10 @@ def register_email_basic_operations_tools(mcp: FastMCP):
 
         except (imaplib.IMAP4.error, imaplib.IMAP4.abort) as e:
             return f"Failed to read email: {e!s}"
+        else:
+            # Add processed content fields
+            result.update(content_fields)
+            return result
 
     @mcp.tool()
     async def mark_email_as_read(uid: int):

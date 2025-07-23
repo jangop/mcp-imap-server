@@ -80,7 +80,9 @@ def register_auth_tools(mcp: FastMCP):
             if not credentials:
                 return f"Account '{account_name}' not found. Use list_stored_accounts to see available accounts."
 
-            state = cast("ImapState", mcp.get_context().request_context.lifespan_context)
+            state = cast(
+                "ImapState", mcp.get_context().request_context.lifespan_context
+            )
 
             mailbox = MailBox(credentials.server)
             mailbox.login(credentials.username, credentials.password)

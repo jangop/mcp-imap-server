@@ -4,6 +4,7 @@ import imaplib
 from imap_tools.query import OR
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
+from ..email.content_processor import content_processor, ContentFormat
 
 
 def register_folder_pagination_tools(mcp: FastMCP):
@@ -15,6 +16,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
         page_size: int = 20,
         folder_name: str = "",
         headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
     ):
         """
         Get emails with pagination support.
@@ -24,6 +26,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
             page_size: Number of emails per page
             folder_name: Name of the folder (empty for current folder)
             headers_only: If True, only fetch headers for faster loading
+            content_format: Content format from ContentFormat enum
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -95,13 +98,14 @@ def register_folder_pagination_tools(mcp: FastMCP):
                     "flags": list(msg.flags),
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text,
-                            "html": msg.html,
-                            "attachment_count": len(msg.attachments),
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+                    result.update(content_fields)
+                    result["attachment_count"] = len(msg.attachments)
                 results.append(result)
 
             # Restore original folder if we changed it
@@ -119,6 +123,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
                 "has_next": page < total_pages,
                 "start_index": start_idx + 1,
                 "end_index": end_idx,
+                "content_format": content_format,
                 "emails": results,
             }
 
@@ -132,6 +137,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
         page_size: int = 20,
         folder_name: str = "",
         headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
     ):
         """
         Search emails with pagination support.
@@ -200,13 +206,14 @@ def register_folder_pagination_tools(mcp: FastMCP):
                     "flags": list(msg.flags),
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text,
-                            "html": msg.html,
-                            "attachment_count": len(msg.attachments),
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+                    result.update(content_fields)
+                    result["attachment_count"] = len(msg.attachments)
                 results.append(result)
 
             # Restore original folder if we changed it
@@ -225,6 +232,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
                 "has_next": page < total_pages,
                 "start_index": start_idx + 1,
                 "end_index": end_idx,
+                "content_format": content_format,
                 "emails": results,
             }
 
@@ -238,6 +246,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
         page_size: int = 20,
         folder_name: str = "",
         headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
     ):
         """
         Get emails filtered by flag with pagination support.
@@ -324,13 +333,14 @@ def register_folder_pagination_tools(mcp: FastMCP):
                     "flags": list(msg.flags),
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text,
-                            "html": msg.html,
-                            "attachment_count": len(msg.attachments),
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+                    result.update(content_fields)
+                    result["attachment_count"] = len(msg.attachments)
                 results.append(result)
 
             # Restore original folder if we changed it
@@ -349,6 +359,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
                 "has_next": page < total_pages,
                 "start_index": start_idx + 1,
                 "end_index": end_idx,
+                "content_format": content_format,
                 "emails": results,
             }
 

@@ -44,34 +44,34 @@ def register_compose_tools(mcp: FastMCP):
         try:
             # Create the email message
             if body_html:
-                msg = MIMEMultipart('alternative')
-                msg['Subject'] = subject
-                msg['From'] = from_address
-                msg['To'] = to_addresses
-                msg['Cc'] = cc_addresses
-                msg['Bcc'] = bcc_addresses
+                msg = MIMEMultipart("alternative")
+                msg["Subject"] = subject
+                msg["From"] = from_address
+                msg["To"] = to_addresses
+                msg["Cc"] = cc_addresses
+                msg["Bcc"] = bcc_addresses
                 if reply_to:
-                    msg['Reply-To'] = reply_to
+                    msg["Reply-To"] = reply_to
 
                 # Add text and HTML parts
-                text_part = MIMEText(body_text, 'plain', 'utf-8')
-                html_part = MIMEText(body_html, 'html', 'utf-8')
+                text_part = MIMEText(body_text, "plain", "utf-8")
+                html_part = MIMEText(body_html, "html", "utf-8")
                 msg.attach(text_part)
                 msg.attach(html_part)
             else:
-                msg = MIMEText(body_text, 'plain', 'utf-8')
-                msg['Subject'] = subject
-                msg['From'] = from_address
-                msg['To'] = to_addresses
-                msg['Cc'] = cc_addresses
-                msg['Bcc'] = bcc_addresses
+                msg = MIMEText(body_text, "plain", "utf-8")
+                msg["Subject"] = subject
+                msg["From"] = from_address
+                msg["To"] = to_addresses
+                msg["Cc"] = cc_addresses
+                msg["Bcc"] = bcc_addresses
                 if reply_to:
-                    msg['Reply-To'] = reply_to
+                    msg["Reply-To"] = reply_to
 
             # Set draft flag if requested
             flags = []
             if is_draft:
-                flags.append(r'\Draft')
+                flags.append(r"\Draft")
 
             # Convert message to bytes and append to the specified folder
             message_bytes = msg.as_bytes()

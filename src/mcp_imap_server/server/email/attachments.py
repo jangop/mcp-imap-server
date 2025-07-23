@@ -44,7 +44,7 @@ def register_email_attachment_tools(mcp: FastMCP):
             # Filter attachments based on include_inline
             attachments_to_process = []
             for att in message.attachments:
-                is_inline = att.content_disposition == 'inline'
+                is_inline = att.content_disposition == "inline"
                 if include_inline or not is_inline:
                     attachments_to_process.append(att)
 
@@ -65,8 +65,12 @@ def register_email_attachment_tools(mcp: FastMCP):
                         filename = attachment.filename
                     else:
                         # Create a filename based on content type and index
-                        ext = attachment.content_type.split('/')[-1] if '/' in attachment.content_type else 'bin'
-                        filename = f"attachment_{i+1}.{ext}"
+                        ext = (
+                            attachment.content_type.split("/")[-1]
+                            if "/" in attachment.content_type
+                            else "bin"
+                        )
+                        filename = f"attachment_{i + 1}.{ext}"
 
                     # Save to specified path or current directory
                     if save_path:
@@ -77,24 +81,28 @@ def register_email_attachment_tools(mcp: FastMCP):
                         file_path = Path(filename)
 
                     # Write attachment data
-                    with open(file_path, 'wb') as f:
+                    with open(file_path, "wb") as f:
                         f.write(attachment.payload)
 
-                    saved_files.append({
-                        "filename": filename,
-                        "path": str(file_path),
-                        "size": len(attachment.payload),
-                        "content_type": attachment.content_type,
-                        "content_id": attachment.content_id,
-                    })
+                    saved_files.append(
+                        {
+                            "filename": filename,
+                            "path": str(file_path),
+                            "size": len(attachment.payload),
+                            "content_type": attachment.content_type,
+                            "content_id": attachment.content_id,
+                        }
+                    )
 
                 except Exception as e:
-                    saved_files.append({
-                        "filename": filename if filename else f"attachment_{i+1}",
-                        "error": f"Failed to save: {e!s}",
-                        "size": len(attachment.payload),
-                        "content_type": attachment.content_type,
-                    })
+                    saved_files.append(
+                        {
+                            "filename": filename if filename else f"attachment_{i + 1}",
+                            "error": f"Failed to save: {e!s}",
+                            "size": len(attachment.payload),
+                            "content_type": attachment.content_type,
+                        }
+                    )
 
             return {
                 "message": f"Successfully extracted {len(saved_files)} attachments from email UID {uid}",
@@ -137,14 +145,16 @@ def register_email_attachment_tools(mcp: FastMCP):
 
             attachments_info = []
             for i, attachment in enumerate(message.attachments):
-                attachments_info.append({
-                    "index": i + 1,
-                    "filename": attachment.filename or f"attachment_{i+1}",
-                    "content_type": attachment.content_type,
-                    "size": len(attachment.payload) if attachment.payload else 0,
-                    "content_id": attachment.content_id,
-                    "content_disposition": attachment.content_disposition,
-                })
+                attachments_info.append(
+                    {
+                        "index": i + 1,
+                        "filename": attachment.filename or f"attachment_{i + 1}",
+                        "content_type": attachment.content_type,
+                        "size": len(attachment.payload) if attachment.payload else 0,
+                        "content_id": attachment.content_id,
+                        "content_disposition": attachment.content_disposition,
+                    }
+                )
 
             return {
                 "message": f"Found {len(attachments_info)} attachments in email UID {uid}",

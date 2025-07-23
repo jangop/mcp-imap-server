@@ -5,6 +5,7 @@ from datetime import datetime
 from imap_tools.query import AND, OR
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
+from .content_processor import content_processor, ContentFormat
 
 
 def register_email_search_tools(mcp: FastMCP):
@@ -12,7 +13,10 @@ def register_email_search_tools(mcp: FastMCP):
 
     @mcp.tool()
     async def search_emails_by_date_range(
-        start_date: str, end_date: str = "", headers_only: bool = True
+        start_date: str,
+        end_date: str = "",
+        headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
     ):
         """
         Search emails within a specific date range.
@@ -21,6 +25,7 @@ def register_email_search_tools(mcp: FastMCP):
             start_date: Start date in YYYY-MM-DD format
             end_date: End date in YYYY-MM-DD format (optional, defaults to start_date)
             headers_only: If True, only fetch headers for faster search (default: True)
+            content_format: Content format ("default", "original_plaintext", "original_html", "markdown_from_html", "all")
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -48,13 +53,14 @@ def register_email_search_tools(mcp: FastMCP):
                     "size": msg.size,
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text,
-                            "html": msg.html,
-                            "attachment_count": len(msg.attachments),
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+                    result.update(content_fields)
+                    result["attachment_count"] = len(msg.attachments)
                 results.append(result)
 
             return {
@@ -63,6 +69,7 @@ def register_email_search_tools(mcp: FastMCP):
                 "end_date": end_date or start_date,
                 "count": len(results),
                 "headers_only": headers_only,
+                "content_format": content_format,
                 "emails": results,
             }
 
@@ -73,7 +80,10 @@ def register_email_search_tools(mcp: FastMCP):
 
     @mcp.tool()
     async def search_emails_by_size(
-        min_size: int = 0, max_size: int = 0, headers_only: bool = True
+        min_size: int = 0,
+        max_size: int = 0,
+        headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
     ):
         """
         Search emails by size range.
@@ -82,6 +92,7 @@ def register_email_search_tools(mcp: FastMCP):
             min_size: Minimum size in bytes (0 for no minimum)
             max_size: Maximum size in bytes (0 for no maximum)
             headers_only: If True, only fetch headers for faster search (default: True)
+            content_format: Content format from ContentFormat enum
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -110,13 +121,14 @@ def register_email_search_tools(mcp: FastMCP):
                     "size": msg.size,
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text,
-                            "html": msg.html,
-                            "attachment_count": len(msg.attachments),
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+                    result.update(content_fields)
+                    result["attachment_count"] = len(msg.attachments)
                 results.append(result)
 
             size_filter = f"{min_size}-{max_size}" if max_size > 0 else f">{min_size}"
@@ -126,6 +138,7 @@ def register_email_search_tools(mcp: FastMCP):
                 "max_size": max_size,
                 "count": len(results),
                 "headers_only": headers_only,
+                "content_format": content_format,
                 "emails": results,
             }
 
@@ -138,6 +151,7 @@ def register_email_search_tools(mcp: FastMCP):
         search_body: bool = True,
         search_subject: bool = False,
         headers_only: bool = False,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
     ):
         """
         Search emails containing specific text in body and/or subject.
@@ -147,6 +161,7 @@ def register_email_search_tools(mcp: FastMCP):
             search_body: Search in email body (default: True)
             search_subject: Search in subject line (default: False)
             headers_only: If True, only fetch headers (default: False, since we're searching content)
+            content_format: Content format from ContentFormat enum
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -175,17 +190,20 @@ def register_email_search_tools(mcp: FastMCP):
                     "size": msg.size,
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text[:200] + "..."
-                            if msg.text and len(msg.text) > 200
-                            else msg.text,
-                            "html": msg.html[:200] + "..."
-                            if msg.html and len(msg.html) > 200
-                            else msg.html,
-                            "attachment_count": len(msg.attachments),
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+
+                    # Truncate long content for search results
+                    for field_name, content in content_fields.items():
+                        if content and len(content) > 200:
+                            content_fields[field_name] = content[:200] + "..."
+
+                    result.update(content_fields)
+                    result["attachment_count"] = len(msg.attachments)
                 results.append(result)
 
             search_location = []
@@ -200,6 +218,7 @@ def register_email_search_tools(mcp: FastMCP):
                 "search_locations": search_location,
                 "count": len(results),
                 "headers_only": headers_only,
+                "content_format": content_format,
                 "emails": results,
             }
 
@@ -208,7 +227,9 @@ def register_email_search_tools(mcp: FastMCP):
 
     @mcp.tool()
     async def search_emails_with_attachments(
-        min_attachments: int = 1, headers_only: bool = True
+        min_attachments: int = 1,
+        headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
     ):
         """
         Find emails that have attachments.
@@ -216,6 +237,7 @@ def register_email_search_tools(mcp: FastMCP):
         Args:
             min_attachments: Minimum number of attachments (default: 1)
             headers_only: If True, only fetch headers for faster search (default: True)
+            content_format: Content format from ContentFormat enum
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -239,7 +261,13 @@ def register_email_search_tools(mcp: FastMCP):
                     "attachment_count": attachment_count,
                 }
                 if not headers_only:
-                    result.update({"text": msg.text, "html": msg.html})
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
+                    )
+                    result.update(content_fields)
                 results.append(result)
 
             return {
@@ -247,6 +275,7 @@ def register_email_search_tools(mcp: FastMCP):
                 "min_attachments": min_attachments,
                 "count": len(results),
                 "headers_only": headers_only,
+                "content_format": content_format,
                 "emails": results,
             }
 
@@ -261,6 +290,7 @@ def register_email_search_tools(mcp: FastMCP):
         draft: bool | None = None,
         answered: bool | None = None,
         headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
     ):
         """
         Search emails by their flags.
@@ -272,6 +302,7 @@ def register_email_search_tools(mcp: FastMCP):
             draft: True for draft emails, False for not draft, None to ignore
             answered: True for answered emails, False for not answered, None to ignore
             headers_only: If True, only fetch headers for faster search (default: True)
+            content_format: Content format from ContentFormat enum
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -320,13 +351,14 @@ def register_email_search_tools(mcp: FastMCP):
                     "flags": list(msg.flags),
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text,
-                            "html": msg.html,
-                            "attachment_count": len(msg.attachments),
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+                    result.update(content_fields)
+                    result["attachment_count"] = len(msg.attachments)
                 results.append(result)
 
             return {
@@ -334,6 +366,7 @@ def register_email_search_tools(mcp: FastMCP):
                 "flag_criteria": flag_descriptions,
                 "count": len(results),
                 "headers_only": headers_only,
+                "content_format": content_format,
                 "emails": results,
             }
 
@@ -353,6 +386,7 @@ def register_email_search_tools(mcp: FastMCP):
         is_unread: bool | None = None,
         is_flagged: bool | None = None,
         headers_only: bool = True,
+        content_format: ContentFormat = ContentFormat.DEFAULT,
     ):
         """
         Advanced email search combining multiple criteria.
@@ -369,6 +403,7 @@ def register_email_search_tools(mcp: FastMCP):
             is_unread: True for unread emails, False for read, None to ignore
             is_flagged: True for flagged emails, False for unflagged, None to ignore
             headers_only: If True, only fetch headers for faster search (default: True)
+            content_format: Content format ("default", "original_plaintext", "original_html", "markdown_from_html", "all")
         """
         mailbox = get_mailbox(mcp.get_context())
 
@@ -450,16 +485,19 @@ def register_email_search_tools(mcp: FastMCP):
                     "flags": list(msg.flags),
                 }
                 if not headers_only:
-                    result.update(
-                        {
-                            "text": msg.text[:200] + "..."
-                            if msg.text and len(msg.text) > 200
-                            else msg.text,
-                            "html": msg.html[:200] + "..."
-                            if msg.html and len(msg.html) > 200
-                            else msg.html,
-                        }
+                    # Process content based on format preference
+                    content_fields = content_processor.process_email_content(
+                        text_content=msg.text,
+                        html_content=msg.html,
+                        content_format=content_format,
                     )
+
+                    # Truncate long content for search results
+                    for field_name, content in content_fields.items():
+                        if content and len(content) > 200:
+                            content_fields[field_name] = content[:200] + "..."
+
+                    result.update(content_fields)
                 results.append(result)
 
             if has_attachments is not None:

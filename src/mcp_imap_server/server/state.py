@@ -8,11 +8,9 @@ from mcp.server.session import ServerSession
 from starlette.requests import Request
 
 
-
-
 class NotLoggedInError(RuntimeError):
     """Raised when trying to access mailbox without being logged in."""
-    
+
     def __init__(self):
         super().__init__("Not logged in. Please login first.")
 
