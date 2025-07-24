@@ -1,7 +1,7 @@
 """Folder pagination tools for IMAP server."""
 
 import imaplib
-from imap_tools.query import OR
+from imap_tools.query import AND, OR
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
 from ..email.content_processing import ContentFormat, build_email_list
@@ -237,23 +237,8 @@ def register_folder_pagination_tools(mcp: FastMCP):
         if page_size < 1 or page_size > 100:
             return "Page size must be between 1 and 100."
 
-        # Map flag names to search criteria
-        flag_mapping = {
-            "SEEN": "SEEN",
-            "UNSEEN": "UNSEEN",
-            "FLAGGED": "FLAGGED",
-            "UNFLAGGED": "UNFLAGGED",
-            "DELETED": "DELETED",
-            "UNDELETED": "UNDELETED",
-            "ANSWERED": "ANSWERED",
-            "UNANSWERED": "UNANSWERED",
-            "DRAFT": "DRAFT",
-            "UNDRAFT": "UNDRAFT",
-        }
-
+        # Map flag names to imap_tools query builder criteria
         flag_upper = flag.upper()
-        if flag_upper not in flag_mapping:
-            return f"Unknown flag '{flag}'. Supported flags: {', '.join(flag_mapping.keys())}"
 
         try:
             # Use current folder if none specified
@@ -263,8 +248,29 @@ def register_folder_pagination_tools(mcp: FastMCP):
             else:
                 folder_name = str(original_folder)
 
-            # Create search criteria using the flag string directly
-            criteria = flag_mapping[flag_upper]
+            # Create search criteria using imap_tools query builder
+            if flag_upper == "SEEN":
+                criteria = AND(seen=True)
+            elif flag_upper == "UNSEEN":
+                criteria = AND(seen=False)
+            elif flag_upper == "FLAGGED":
+                criteria = AND(flagged=True)
+            elif flag_upper == "UNFLAGGED":
+                criteria = AND(flagged=False)
+            elif flag_upper == "DELETED":
+                criteria = AND(deleted=True)
+            elif flag_upper == "UNDELETED":
+                criteria = AND(deleted=False)
+            elif flag_upper == "ANSWERED":
+                criteria = AND(answered=True)
+            elif flag_upper == "UNANSWERED":
+                criteria = AND(answered=False)
+            elif flag_upper == "DRAFT":
+                criteria = AND(draft=True)
+            elif flag_upper == "UNDRAFT":
+                criteria = AND(draft=False)
+            else:
+                return f"Unknown flag '{flag}'. Supported flags: SEEN, UNSEEN, FLAGGED, UNFLAGGED, DELETED, UNDELETED, ANSWERED, UNANSWERED, DRAFT, UNDRAFT"
 
             # Get all matching messages
             matching_messages = list(mailbox.fetch(criteria, headers_only=True))
