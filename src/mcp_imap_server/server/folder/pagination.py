@@ -84,8 +84,9 @@ def register_folder_pagination_tools(mcp: FastMCP):
                 }
 
             # Fetch messages for this page using UID criteria
-            # Convert UIDs to string format for search criteria
-            uid_criteria = " OR ".join([f"UID {uid}" for uid in page_uids])
+            # Convert UIDs to comma-separated format for UID search
+            uid_list = ",".join(str(uid) for uid in page_uids)
+            uid_criteria = f"UID {uid_list}"
             page_messages = list(mailbox.fetch(uid_criteria, headers_only=headers_only))
 
             # Format results using centralized formatting functions
