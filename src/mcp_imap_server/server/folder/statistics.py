@@ -1,6 +1,7 @@
 """Folder statistics tools for IMAP server."""
 
 import imaplib
+from typing import Any
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
 
@@ -9,7 +10,7 @@ def register_folder_statistics_tools(mcp: FastMCP):
     """Register folder statistics tools with the MCP server."""
 
     @mcp.tool()
-    async def get_folder_statistics(folder_name: str = ""):
+    async def get_folder_statistics(folder_name: str = "") -> dict[str, Any] | str:
         """
         Get comprehensive statistics for a folder.
 
@@ -92,7 +93,9 @@ def register_folder_statistics_tools(mcp: FastMCP):
             return f"Failed to get folder statistics: {e!s}"
 
     @mcp.tool()
-    async def get_folder_size_distribution(folder_name: str = ""):
+    async def get_folder_size_distribution(
+        folder_name: str = "",
+    ) -> dict[str, Any] | str:
         """
         Get email size distribution for a folder.
 
@@ -172,7 +175,9 @@ def register_folder_statistics_tools(mcp: FastMCP):
             return f"Failed to get folder size distribution: {e!s}"
 
     @mcp.tool()
-    async def get_folder_date_distribution(folder_name: str = ""):
+    async def get_folder_date_distribution(
+        folder_name: str = "",
+    ) -> dict[str, Any] | str:
         """
         Get email date distribution for a folder.
 
@@ -196,7 +201,7 @@ def register_folder_statistics_tools(mcp: FastMCP):
                 return {
                     "message": f"No messages in folder '{folder_name}'",
                     "folder": folder_name,
-                    "total_messages": 0,
+                    "total_messages": len(all_messages),
                 }
 
             # Calculate date statistics
@@ -247,7 +252,9 @@ def register_folder_statistics_tools(mcp: FastMCP):
             return f"Failed to get folder date distribution: {e!s}"
 
     @mcp.tool()
-    async def get_top_senders(folder_name: str = "", limit: int = 10):
+    async def get_top_senders(
+        folder_name: str = "", limit: int = 10
+    ) -> dict[str, Any] | str:
         """
         Get top senders by email count in a folder.
 

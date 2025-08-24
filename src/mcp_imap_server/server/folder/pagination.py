@@ -1,6 +1,7 @@
 """Folder pagination tools for IMAP server."""
 
 import imaplib
+from typing import Any
 from imap_tools.query import AND, OR
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
@@ -17,7 +18,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
         folder_name: str = "",
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Get emails with pagination support.
 
@@ -122,7 +123,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
         folder_name: str = "",
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Search emails with pagination support.
 
@@ -215,7 +216,7 @@ def register_folder_pagination_tools(mcp: FastMCP):
         folder_name: str = "",
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Get emails filtered by flag with pagination support.
 

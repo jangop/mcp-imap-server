@@ -1,6 +1,7 @@
 """Email bulk operations tools for IMAP server."""
 
 import imaplib
+from typing import Any
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
 
@@ -9,7 +10,7 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
     """Register email bulk operations tools with the MCP server."""
 
     @mcp.tool()
-    async def bulk_mark_as_read(uids: list[int]):
+    async def bulk_mark_as_read(uids: list[int]) -> dict[str, Any] | str:
         """
         Mark multiple emails as read using their UIDs.
 
@@ -39,7 +40,7 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             return f"Failed to mark emails as read: {e!s}"
 
     @mcp.tool()
-    async def bulk_mark_as_unread(uids: list[int]):
+    async def bulk_mark_as_unread(uids: list[int]) -> dict[str, Any] | str:
         """
         Mark multiple emails as unread using their UIDs.
 
@@ -69,7 +70,7 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             return f"Failed to mark emails as unread: {e!s}"
 
     @mcp.tool()
-    async def bulk_delete_emails(uids: list[int]):
+    async def bulk_delete_emails(uids: list[int]) -> dict[str, Any] | str:
         """
         Delete multiple emails using their UIDs.
 
@@ -100,7 +101,9 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             return f"Failed to delete emails: {e!s}"
 
     @mcp.tool()
-    async def bulk_copy_emails(uids: list[int], destination_folder: str):
+    async def bulk_copy_emails(
+        uids: list[int], destination_folder: str
+    ) -> dict[str, Any] | str:
         """
         Copy multiple emails to another folder using their UIDs.
 
@@ -132,7 +135,9 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             return f"Failed to copy emails: {e!s}"
 
     @mcp.tool()
-    async def bulk_move_emails(uids: list[int], destination_folder: str):
+    async def bulk_move_emails(
+        uids: list[int], destination_folder: str
+    ) -> dict[str, Any] | str:
         """
         Move multiple emails to another folder using their UIDs.
 
@@ -164,7 +169,9 @@ def register_email_bulk_operations_tools(mcp: FastMCP):
             return f"Failed to move emails: {e!s}"
 
     @mcp.tool()
-    async def bulk_flag_emails(uids: list[int], flag: str, value: bool = True):
+    async def bulk_flag_emails(
+        uids: list[int], flag: str, value: bool = True
+    ) -> dict[str, Any] | str:
         """
         Set or unset flags for multiple emails using their UIDs.
 

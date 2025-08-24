@@ -3,6 +3,7 @@
 import imaplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from .state import get_mailbox
@@ -23,7 +24,7 @@ def register_compose_tools(mcp: FastMCP):
         bcc_addresses: str = "",
         reply_to: str = "",
         is_draft: bool = False,
-    ):
+    ) -> dict[str, Any] | str:
         """
         Create and append an email to the specified folder (e.g., Drafts).
 

@@ -2,6 +2,7 @@
 
 import imaplib
 from datetime import datetime
+from typing import Any
 from imap_tools.query import AND, OR
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
@@ -22,7 +23,7 @@ def register_email_search_tools(mcp: FastMCP):
         end_date: str = "",
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Search emails within a specific date range.
 
@@ -74,7 +75,7 @@ def register_email_search_tools(mcp: FastMCP):
         max_size: int = 0,
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Search emails by size range.
 
@@ -127,7 +128,7 @@ def register_email_search_tools(mcp: FastMCP):
         search_subject: bool = False,
         headers_only: bool = False,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Search emails containing specific text in body and/or subject.
 
@@ -186,7 +187,7 @@ def register_email_search_tools(mcp: FastMCP):
         min_attachments: int = 1,
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Find emails that have attachments.
 
@@ -236,7 +237,7 @@ def register_email_search_tools(mcp: FastMCP):
         answered: bool | None = None,
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Search emails by their flags.
 
@@ -332,7 +333,7 @@ def register_email_search_tools(mcp: FastMCP):
         is_flagged: bool | None = None,
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Advanced email search combining multiple criteria.
 
@@ -442,6 +443,7 @@ def register_email_search_tools(mcp: FastMCP):
                 "search_criteria": search_description,
                 "count": len(results),
                 "headers_only": headers_only,
+                "content_format": content_format,
                 "emails": results,
             }
 

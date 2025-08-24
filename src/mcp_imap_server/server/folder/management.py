@@ -1,6 +1,7 @@
 """Folder management tools for IMAP server."""
 
 import imaplib
+from typing import Any
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
 
@@ -9,7 +10,7 @@ def register_folder_management_tools(mcp: FastMCP):
     """Register folder management tools with the MCP server."""
 
     @mcp.tool()
-    async def list_folders():
+    async def list_folders() -> dict[str, Any] | str:
         """
         List all available folders/mailboxes.
         """
@@ -56,7 +57,7 @@ def register_folder_management_tools(mcp: FastMCP):
             return f"Failed to list folders: {e!s}"
 
     @mcp.tool()
-    async def select_folder(folder_name: str):
+    async def select_folder(folder_name: str) -> dict[str, Any] | str:
         """
         Select/switch to a specific folder.
 
@@ -79,7 +80,7 @@ def register_folder_management_tools(mcp: FastMCP):
             }
 
     @mcp.tool()
-    async def create_folder(folder_name: str):
+    async def create_folder(folder_name: str) -> dict[str, Any] | str:
         """
         Create a new folder/mailbox.
 
@@ -101,7 +102,7 @@ def register_folder_management_tools(mcp: FastMCP):
             }
 
     @mcp.tool()
-    async def delete_folder(folder_name: str):
+    async def delete_folder(folder_name: str) -> dict[str, Any] | str:
         """
         Delete a folder/mailbox.
 
@@ -123,7 +124,7 @@ def register_folder_management_tools(mcp: FastMCP):
             }
 
     @mcp.tool()
-    async def rename_folder(old_name: str, new_name: str):
+    async def rename_folder(old_name: str, new_name: str) -> dict[str, Any] | str:
         """
         Rename a folder/mailbox.
 
@@ -147,7 +148,7 @@ def register_folder_management_tools(mcp: FastMCP):
             }
 
     @mcp.tool()
-    async def subscribe_to_folder(folder_name: str):
+    async def subscribe_to_folder(folder_name: str) -> dict[str, Any] | str:
         """
         Subscribe to a folder.
 
@@ -169,7 +170,7 @@ def register_folder_management_tools(mcp: FastMCP):
             }
 
     @mcp.tool()
-    async def unsubscribe_from_folder(folder_name: str):
+    async def unsubscribe_from_folder(folder_name: str) -> dict[str, Any] | str:
         """
         Unsubscribe from a folder.
 
@@ -191,7 +192,7 @@ def register_folder_management_tools(mcp: FastMCP):
             }
 
     @mcp.tool()
-    async def get_folder_status(folder_name: str = ""):
+    async def get_folder_status(folder_name: str = "") -> dict[str, Any] | str:
         """
         Get status information for a folder.
 

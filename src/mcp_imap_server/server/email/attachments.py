@@ -2,6 +2,7 @@
 
 import imaplib
 from pathlib import Path
+from typing import Any
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
 
@@ -12,7 +13,7 @@ def register_email_attachment_tools(mcp: FastMCP):
     @mcp.tool()
     async def extract_attachments(
         uid: int, save_path: str = "", include_inline: bool = False
-    ):
+    ) -> dict[str, Any] | str:
         """
         Extract attachments from a specific email.
 
@@ -116,7 +117,7 @@ def register_email_attachment_tools(mcp: FastMCP):
             return f"Failed to extract attachments: {e!s}"
 
     @mcp.tool()
-    async def list_attachments(uid: int):
+    async def list_attachments(uid: int) -> dict[str, Any] | str:
         """
         List attachments for a specific email without extracting them.
 
@@ -139,6 +140,7 @@ def register_email_attachment_tools(mcp: FastMCP):
                 return {
                     "message": f"No attachments found in email UID {uid}",
                     "email_subject": message.subject,
+                    "email_uid": uid,
                     "attachment_count": 0,
                     "attachments": [],
                 }

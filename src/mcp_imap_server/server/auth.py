@@ -16,7 +16,7 @@ def register_auth_tools(mcp: FastMCP):
     """Register authentication-related tools with the MCP server."""
 
     @mcp.tool()
-    async def login(username: str, password: str, server: str):
+    async def login(username: str, password: str, server: str) -> str:
         """
         Log in to an IMAP server.
 
@@ -39,7 +39,7 @@ def register_auth_tools(mcp: FastMCP):
             return "Login successful."
 
     @mcp.tool()
-    async def logout():
+    async def logout() -> str:
         """Log out of the IMAP server."""
         state = cast("ImapState", mcp.get_context().request_context.lifespan_context)
 
@@ -57,7 +57,7 @@ def register_auth_tools(mcp: FastMCP):
             return "Logout successful."
 
     @mcp.tool()
-    async def list_stored_accounts():
+    async def list_stored_accounts() -> str:
         """List all stored account names."""
         accounts = credential_manager.list_accounts()
 
@@ -67,7 +67,7 @@ def register_auth_tools(mcp: FastMCP):
         return f"Stored accounts: {', '.join(accounts)}"
 
     @mcp.tool()
-    async def login_with_stored_account(account_name: str):
+    async def login_with_stored_account(account_name: str) -> str:
         """
         Log in using stored account credentials.
 

@@ -2,6 +2,7 @@
 
 import imaplib
 from datetime import datetime, UTC
+from typing import Any
 from imap_tools.query import AND
 from mcp.server.fastmcp import FastMCP
 from ..state import get_mailbox
@@ -16,7 +17,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
         limit: int = 10,
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         List recent emails from the current folder.
 
@@ -73,7 +74,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
         limit: int = 10,
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Filter emails by sender address.
 
@@ -117,7 +118,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
         limit: int = 10,
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Filter emails by subject line (partial match).
 
@@ -160,7 +161,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
         count: int = 5,
         headers_only: bool = True,
         content_format: ContentFormat = ContentFormat.DEFAULT,
-    ):
+    ) -> dict[str, Any]:
         """
         Get the most recent emails from the current folder.
 
@@ -214,7 +215,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
     @mcp.tool()
     async def read_email(
         uid: int, content_format: ContentFormat = ContentFormat.DEFAULT
-    ):
+    ) -> dict[str, Any]:
         """
         Read a specific email by its UID and return full content.
 
@@ -251,7 +252,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             return result
 
     @mcp.tool()
-    async def mark_email_as_read(uid: int):
+    async def mark_email_as_read(uid: int) -> dict[str, Any]:
         """
         Mark a specific email as read.
 
@@ -274,7 +275,7 @@ def register_email_basic_operations_tools(mcp: FastMCP):
             }
 
     @mcp.tool()
-    async def delete_email(uid: int):
+    async def delete_email(uid: int) -> dict[str, Any]:
         """
         Delete a specific email.
 
